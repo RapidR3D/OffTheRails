@@ -36,6 +36,8 @@ namespace OffTheRails.Tracks
 
         /// <summary>
         /// Constructor
+        /// Note: PathID uses Guid for uniqueness. For serialization/networking,
+        /// consider implementing a custom ID management system.
         /// </summary>
         public TrackPath()
         {

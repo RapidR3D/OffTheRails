@@ -55,6 +55,11 @@ namespace OffTheRails.Tracks
         /// </summary>
         public ConnectionPoint[] ConnectionPoints { get; private set; }
 
+        // Cached world waypoints
+        private Vector2[] cachedWorldWaypoints = null;
+        private Vector3 lastCachedPosition;
+        private Quaternion lastCachedRotation;
+
         /// <summary>
         /// Waypoints in world space for trains to follow
         /// </summary>
@@ -62,12 +67,21 @@ namespace OffTheRails.Tracks
         {
             get
             {
-                Vector2[] worldPoints = new Vector2[localWaypoints.Count];
-                for (int i = 0; i < localWaypoints.Count; i++)
+                // Recalculate if transform changed or cache is invalid
+                if (cachedWorldWaypoints == null || 
+                    cachedWorldWaypoints.Length != localWaypoints.Count ||
+                    transform.position != lastCachedPosition || 
+                    transform.rotation != lastCachedRotation)
                 {
-                    worldPoints[i] = transform.TransformPoint(localWaypoints[i]);
+                    cachedWorldWaypoints = new Vector2[localWaypoints.Count];
+                    for (int i = 0; i < localWaypoints.Count; i++)
+                    {
+                        cachedWorldWaypoints[i] = transform.TransformPoint(localWaypoints[i]);
+                    }
+                    lastCachedPosition = transform.position;
+                    lastCachedRotation = transform.rotation;
                 }
-                return worldPoints;
+                return cachedWorldWaypoints;
             }
         }
 
@@ -137,6 +151,7 @@ namespace OffTheRails.Tracks
         public void GenerateWaypoints()
         {
             localWaypoints.Clear();
+            cachedWorldWaypoints = null; // Invalidate cache
 
             if (ConnectionPoints.Length < 2)
             {
