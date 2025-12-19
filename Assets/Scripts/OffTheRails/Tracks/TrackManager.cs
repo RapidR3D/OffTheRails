@@ -1,509 +1,248 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
-using OffTheRails.Tracks;
 
 namespace OffTheRails.Tracks
 {
-    /// <summary>
-    /// Singleton manager that handles all track pieces and their connections.
-    /// Manages snapping logic and path generation.
-    /// </summary>
-    [ExecuteAlways]
     public class TrackManager : MonoBehaviour
     {
-        private static TrackManager instance;
-        private static bool isQuitting = false;
+        public static TrackManager Instance { get; private set; }
 
-        /// <summary>
-        /// Singleton instance of the TrackManager
-        /// </summary>
-        public static TrackManager Instance
+        [SerializeField] private List<TrackPiece> registeredTracks = new List<TrackPiece>();
+        [SerializeField] private List<TrackPath> paths = new List<TrackPath>();
+
+        // ADD THIS: Lazy getter that works in edit mode
+        public static TrackManager GetInstance()
         {
-            get
+            if (Instance != null)
+                return Instance;
+            
+            // In edit mode, find it
+            #if UNITY_EDITOR
+            if (!Application.isPlaying)
             {
-                if (isQuitting)
-                {
-                    return null;
-                }
-
-                if (instance == null)
-                {
-                    instance = FindFirstObjectByType<TrackManager>();
-                    
-                    if (instance == null)
-                    {
-                        GameObject go = new GameObject("TrackManager");
-                        instance = go.AddComponent<TrackManager>();
-                        Debug.Log("TrackManager instance created automatically");
-                    }
-                }
-                return instance;
+                return UnityEngine.Object.FindFirstObjectByType<TrackManager>();
             }
-        }
-
-        [Header("Snapping Settings")]
-        [Tooltip("Default snap radius for track connections")]
-        [SerializeField] private float defaultSnapRadius = 0.5f;
-
-        [Tooltip("Automatically generate paths when tracks connect")]
-        [SerializeField] private bool autoGeneratePaths = true;
-
-        [Header("Debug")]
-        [Tooltip("Enable debug logging")]
-        [SerializeField] private bool enableDebugLogs = true;
-
-        [Tooltip("Show path gizmos in scene view")]
-        [SerializeField] private bool showPathGizmos = true;
-
-        [Tooltip("Color for path gizmos")]
-        [SerializeField] private Color pathGizmoColor = Color.magenta;
-
-        /// <summary>
-        /// All registered track pieces
-        /// </summary>
-        private List<TrackPiece> allTracks = new List<TrackPiece>();
-
-        /// <summary>
-        /// All generated paths
-        /// </summary>
-        private List<TrackPath> allPaths = new List<TrackPath>();
-
-        /// <summary>
-        /// Default snap radius
-        /// </summary>
-        public float DefaultSnapRadius => defaultSnapRadius;
-
-        /// <summary>
-        /// Check if an instance of TrackManager exists
-        /// </summary>
-        public static bool HasInstance
-        {
-            get
-            {
-                if (isQuitting) return false;
-                return instance != null;
-            }
+            #endif
+            
+            return Instance;
         }
 
         private void Awake()
         {
-            // Enforce singleton pattern
-            if (instance != null && instance != this)
+            if (Instance == null)
             {
-                // In Edit Mode, we might have duplicates temporarily, but we should clean up
-                if (Application.isPlaying)
-                {
-                    Debug.LogWarning("Multiple TrackManager instances detected. Destroying duplicate.");
-                    Destroy(gameObject);
-                    return;
-                }
+                Instance = this;
+            }
+            else if (Instance != this)
+            {
+                Debug.LogWarning($"Multiple TrackManagers detected! Destroying duplicate on {gameObject.name}");
+                Destroy(gameObject);
+                return;
             }
 
-            instance = this;
+            RefreshTracks();
         }
 
-        private void OnEnable()
+        private void OnDestroy()
         {
-            if (!Application.isPlaying)
+            if (Instance == this)
             {
-                RefreshTracks();
-                RebuildConnections();
-                RegenerateAllPaths();
+                Instance = null;
             }
-        }
-
-        private void OnApplicationQuit()
-        {
-            isQuitting = true;
         }
 
         /// <summary>
         /// Register a track piece with the manager
         /// </summary>
-        /// <param name="track">The track piece to register</param>
         public void RegisterTrack(TrackPiece track)
         {
             if (track == null)
-                return;
-
-            if (!allTracks.Contains(track))
             {
-                allTracks.Add(track);
+                Debug.LogWarning("Attempted to register null track");
+                return;
+            }
+
+            if (!registeredTracks.Contains(track))
+            {
+                registeredTracks.Add(track);
+                Debug.Log($"Registered track: {track.name}");
                 
-                if (enableDebugLogs)
-                    Debug.Log($"Registered track: {track.gameObject.name}");
+                #if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    UnityEditor.EditorUtility.SetDirty(this);
+                }
+                #endif
             }
         }
 
         /// <summary>
         /// Unregister a track piece from the manager
         /// </summary>
-        /// <param name="track">The track piece to unregister</param>
         public void UnregisterTrack(TrackPiece track)
         {
-            if (track == null)
-                return;
+            if (track == null) return;
 
-            if (allTracks.Contains(track))
+            if (registeredTracks.Remove(track))
             {
                 // Disconnect all connection points
-                foreach (var connectionPoint in track.ConnectionPoints)
+                foreach (var cp in track.ConnectionPoints)
                 {
-                    connectionPoint.Disconnect();
+                    if (cp.IsConnected)
+                    {
+                        cp.Disconnect();
+                    }
                 }
 
-                allTracks.Remove(track);
+                Debug.Log($"Unregistered track: {track.name}");
+                RegenerateAllPaths();
                 
-                // Regenerate paths
-                if (autoGeneratePaths)
+                #if UNITY_EDITOR
+                if (!Application.isPlaying)
                 {
-                    RegenerateAllPaths();
+                    UnityEditor.EditorUtility.SetDirty(this);
                 }
-
-                if (enableDebugLogs)
-                    Debug.Log($"Unregistered track: {track.gameObject.name}");
+                #endif
             }
         }
 
         /// <summary>
-        /// Get all registered track pieces
+        /// Get all registered tracks - WORKS IN EDIT MODE
         /// </summary>
-        /// <returns>List of all track pieces</returns>
-        public List<TrackPiece> GetAllTracks()
+        public IEnumerable<TrackPiece> GetAllTracks()
         {
-            return new List<TrackPiece>(allTracks);
+            #if UNITY_EDITOR
+            // In edit mode, always search fresh since registration might not work
+            if (!Application.isPlaying)
+            {
+                return UnityEngine.Object.FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
+            }
+            #endif
+            
+            return registeredTracks;
         }
 
         /// <summary>
-        /// Refresh the list of tracks from the scene (useful for Editor tools)
+        /// Refresh the list of registered tracks - WORKS IN EDIT MODE
         /// </summary>
         public void RefreshTracks()
         {
-            allTracks.Clear();
-            TrackPiece[] tracks = FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
-            foreach (var track in tracks)
+            #if UNITY_EDITOR
+            if (!Application.isPlaying)
             {
-                RegisterTrack(track);
+                // In edit mode, find all tracks in scene
+                registeredTracks.Clear();
+                var allTracks = UnityEngine.Object.FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
+                registeredTracks.AddRange(allTracks);
+                Debug.Log($"Refreshed {registeredTracks.Count} tracks in edit mode");
+                UnityEditor.EditorUtility.SetDirty(this);
+                return;
             }
+            #endif
+
+            // Runtime: Clean up null references
+            registeredTracks.RemoveAll(t => t == null);
+
+            // Find any tracks that aren't registered
+            var allTracks2 = FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
+            foreach (var track in allTracks2)
+            {
+                if (!registeredTracks.Contains(track))
+                {
+                    registeredTracks.Add(track);
+                }
+            }
+
+            Debug.Log($"Refreshed tracks: {registeredTracks.Count} total");
         }
 
         /// <summary>
-        /// Rebuild connections between tracks based on proximity
+        /// Find all connected track pieces starting from the given track
         /// </summary>
-        public void RebuildConnections()
+        public HashSet<TrackPiece> FindConnectedTracks(TrackPiece startTrack)
         {
-            foreach (var track in allTracks)
+            HashSet<TrackPiece> connected = new HashSet<TrackPiece>();
+            Queue<TrackPiece> toProcess = new Queue<TrackPiece>();
+
+            toProcess.Enqueue(startTrack);
+            connected.Add(startTrack);
+
+            while (toProcess.Count > 0)
             {
-                foreach (var point in track.ConnectionPoints)
+                TrackPiece current = toProcess.Dequeue();
+
+                foreach (var cp in current.ConnectionPoints)
                 {
-                    if (point.IsConnected)
-                        continue;
-
-                    // Find matching connection
-                    foreach (var otherTrack in allTracks)
+                    if (cp.IsConnected)
                     {
-                        if (otherTrack == track) continue;
-
-                        foreach (var otherPoint in otherTrack.ConnectionPoints)
+                        TrackPiece neighbor = cp.ConnectedTo.ParentTrack;
+                        if (!connected.Contains(neighbor))
                         {
-                            if (otherPoint.IsConnected) continue;
-
-                            // Check if they are effectively in the same position
-                            if (Vector2.Distance(point.WorldPosition, otherPoint.WorldPosition) < 0.01f)
-                            {
-                                // Check alignment
-                                float dot = Vector2.Dot(point.WorldDirection, otherPoint.WorldDirection);
-                                if (dot <= -0.9f) // Roughly opposite
-                                {
-                                    point.ConnectTo(otherPoint);
-                                }
-                            }
+                            connected.Add(neighbor);
+                            toProcess.Enqueue(neighbor);
                         }
                     }
                 }
             }
+
+            return connected;
         }
 
         /// <summary>
-        /// Get all generated paths
-        /// </summary>
-        /// <returns>List of all paths</returns>
-        public List<TrackPath> GetAllPaths()
-        {
-            return new List<TrackPath>(allPaths);
-        }
-
-        /// <summary>
-        /// Attempt to snap all tracks in the scene
-        /// </summary>
-        public void SnapAllTracks()
-        {
-            RefreshTracks();
-            int snapCount = 0;
-            foreach (var track in allTracks)
-            {
-                if (TrySnapTrack(track))
-                {
-                    snapCount++;
-                }
-            }
-            
-            if (snapCount > 0)
-            {
-                Debug.Log($"Snapped {snapCount} tracks.");
-                RegenerateAllPaths();
-            }
-        }
-
-        /// <summary>
-        /// Attempt to snap a track piece to nearby connection points
-        /// </summary>
-        /// <param name="track">The track piece to snap</param>
-        /// <returns>True if snapping occurred</returns>
-        public bool TrySnapTrack(TrackPiece track)
-        {
-            if (track == null)
-                return false;
-
-            bool snapped = false;
-
-            // Try to snap each connection point
-            foreach (var connectionPoint in track.ConnectionPoints)
-            {
-                if (connectionPoint.IsConnected)
-                    continue;
-
-                // Find nearest valid connection
-                ConnectionPoint nearest = connectionPoint.FindNearestValidConnection();
-
-                if (nearest != null)
-                {
-                    // Calculate alignment
-                    if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 position, out Quaternion rotation))
-                    {
-                        // Apply alignment
-                        track.transform.position = position;
-                        track.transform.rotation = rotation;
-
-                        // Connect the points
-                        connectionPoint.ConnectTo(nearest);
-                        snapped = true;
-
-                        if (enableDebugLogs)
-                            Debug.Log($"Snapped {track.gameObject.name} to {nearest.ParentTrack.gameObject.name}");
-
-                        break; // Only snap one connection at a time
-                    }
-                }
-            }
-
-            // Regenerate paths if we snapped
-            if (snapped && autoGeneratePaths)
-            {
-                RegenerateAllPaths();
-            }
-
-            return snapped;
-        }
-
-        /// <summary>
-        /// Find the nearest valid connection point to a given position
-        /// </summary>
-        /// <param name="position">The position to check from</param>
-        /// <param name="excludeTrack">Track to exclude from search (optional)</param>
-        /// <returns>The nearest valid connection point, or null if none found</returns>
-        public ConnectionPoint FindNearestConnectionPoint(Vector2 position, TrackPiece excludeTrack = null)
-        {
-            ConnectionPoint nearest = null;
-            float nearestDistance = float.MaxValue;
-
-            foreach (var track in allTracks)
-            {
-                if (track == excludeTrack)
-                    continue;
-
-                foreach (var point in track.ConnectionPoints)
-                {
-                    if (point.IsConnected)
-                        continue;
-
-                    float distance = Vector2.Distance(position, point.WorldPosition);
-                    
-                    if (distance < nearestDistance && distance <= defaultSnapRadius)
-                    {
-                        nearest = point;
-                        nearestDistance = distance;
-                    }
-                }
-            }
-
-            return nearest;
-        }
-
-        /// <summary>
-        /// Connect two connection points
-        /// </summary>
-        /// <param name="point1">First connection point</param>
-        /// <param name="point2">Second connection point</param>
-        /// <returns>True if connection was successful</returns>
-        public bool ConnectPoints(ConnectionPoint point1, ConnectionPoint point2)
-        {
-            if (point1 == null || point2 == null)
-                return false;
-
-            if (!point1.CanConnectTo(point2))
-                return false;
-
-            point1.ConnectTo(point2);
-
-            // Regenerate paths
-            if (autoGeneratePaths)
-            {
-                RegenerateAllPaths();
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Disconnect two connection points
-        /// </summary>
-        /// <param name="point">The connection point to disconnect</param>
-        public void DisconnectPoint(ConnectionPoint point)
-        {
-            if (point == null)
-                return;
-
-            point.Disconnect();
-
-            // Regenerate paths
-            if (autoGeneratePaths)
-            {
-                RegenerateAllPaths();
-            }
-        }
-
-        /// <summary>
-        /// Generate all paths from connected tracks
+        /// Regenerate all track paths
         /// </summary>
         public void RegenerateAllPaths()
         {
-            allPaths.Clear();
+            paths.Clear();
 
-            HashSet<TrackPiece> processed = new HashSet<TrackPiece>();
+            HashSet<TrackPiece> processedTracks = new HashSet<TrackPiece>();
 
-            // Build paths from connected track networks
-            foreach (var track in allTracks)
+            foreach (var track in GetAllTracks())
             {
-                if (processed.Contains(track))
+                if (track == null || processedTracks.Contains(track))
                     continue;
 
-                // Only create paths for tracks that have connections
-                if (!track.HasConnections())
+                // Find all connected tracks
+                HashSet<TrackPiece> connectedGroup = FindConnectedTracks(track);
+
+                // Mark all as processed
+                foreach (var t in connectedGroup)
                 {
-                    processed.Add(track);
-                    continue;
+                    processedTracks.Add(t);
                 }
 
-                // Create a new path starting from this track
+                // Build path from this group
                 TrackPath path = new TrackPath();
                 path.BuildFromTrack(track);
-
-                // Mark all tracks in this path as processed
-                foreach (var trackInPath in path.TrackPieces)
-                {
-                    processed.Add(trackInPath);
-                }
-
-                allPaths.Add(path);
-
-                if (enableDebugLogs)
-                    Debug.Log($"Generated path with {path.TrackPieces.Count} tracks and {path.Waypoints.Count} waypoints");
+                paths.Add(path);
             }
+
+            Debug.Log($"Generated {paths.Count} path(s) with {processedTracks.Count} tracks total");
+            
+            #if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                UnityEditor.EditorUtility.SetDirty(this);
+            }
+            #endif
         }
 
         /// <summary>
-        /// Find the path that contains a specific track piece
+        /// Get all track paths
         /// </summary>
-        /// <param name="track">The track piece to search for</param>
-        /// <returns>The path containing the track, or null if not found</returns>
-        public TrackPath FindPathContainingTrack(TrackPiece track)
+        public IReadOnlyList<TrackPath> GetPaths()
         {
-            foreach (var path in allPaths)
-            {
-                if (path.ContainsTrack(track))
-                    return path;
-            }
-            return null;
+            return paths.AsReadOnly();
         }
 
         /// <summary>
-        /// Get all connection points that are available (not connected)
+        /// Find the path that contains the given track
         /// </summary>
-        /// <returns>List of available connection points</returns>
-        public List<ConnectionPoint> GetAvailableConnectionPoints()
+        public TrackPath FindPathContaining(TrackPiece track)
         {
-            List<ConnectionPoint> available = new List<ConnectionPoint>();
-
-            foreach (var track in allTracks)
-            {
-                foreach (var point in track.ConnectionPoints)
-                {
-                    if (!point.IsConnected)
-                    {
-                        available.Add(point);
-                    }
-                }
-            }
-
-            return available;
+            return paths.FirstOrDefault(p => p.TrackPieces.Contains(track));
         }
-
-        private void OnDrawGizmos()
-        {
-            if (!showPathGizmos || allPaths == null)
-                return;
-
-            // Draw all paths
-            Gizmos.color = pathGizmoColor;
-
-            foreach (var path in allPaths)
-            {
-                if (path.Waypoints.Count < 2)
-                    continue;
-
-                // Draw path waypoints
-                for (int i = 1; i < path.Waypoints.Count; i++)
-                {
-                    Gizmos.DrawLine(path.Waypoints[i - 1], path.Waypoints[i]);
-                }
-
-                // Draw waypoint spheres
-                foreach (var waypoint in path.Waypoints)
-                {
-                    Gizmos.DrawSphere(waypoint, 0.05f);
-                }
-            }
-        }
-
-#if UNITY_EDITOR
-        [UnityEditor.MenuItem("GameObject/Off The Rails/Track Manager", false, 0)]
-        private static void CreateTrackManager()
-        {
-            // Check if one already exists
-            TrackManager existing = FindFirstObjectByType<TrackManager>();
-            if (existing != null)
-            {
-                UnityEditor.Selection.activeGameObject = existing.gameObject;
-                Debug.Log("TrackManager already exists in scene");
-                return;
-            }
-
-            GameObject managerObject = new GameObject("TrackManager");
-            managerObject.AddComponent<TrackManager>();
-            UnityEditor.Selection.activeGameObject = managerObject;
-            Debug.Log("Created TrackManager in scene");
-        }
-#endif
     }
 }

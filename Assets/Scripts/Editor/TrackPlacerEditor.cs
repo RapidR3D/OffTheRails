@@ -1,17 +1,17 @@
-using UnityEngine;
-using UnityEditor;
 using OffTheRails.Tracks;
+using UnityEditor;
+using UnityEngine;
 
-namespace OffTheRails.Tracks
+namespace Editor
 {
     [CustomEditor(typeof(TrackPlacer))]
-    public class TrackPlacerEditor : Editor
+    public class TrackPlacerEditor : UnityEditor.Editor
     {
         private TrackPlacer placer;
         private int selectedPrefabIndex = 0;
         private float currentRotation = 0f;
         private GameObject previewObject;
-
+        private bool previewPositionValid = false;
 
         private void OnEnable()
         {
@@ -20,6 +20,7 @@ namespace OffTheRails.Tracks
 
         private void OnDisable()
         {
+            previewPositionValid = false;
             DestroyPreview();
         }
 
@@ -217,7 +218,7 @@ namespace OffTheRails.Tracks
 
                 foreach (var connectionPoint in previewTrack.ConnectionPoints)
                 {
-                    ConnectionPoint nearest = connectionPoint.FindNearestConnectionForSnapping();
+                    ConnectionPoint nearest = connectionPoint.FindNearestConnectionForEditor();
 
                     if (nearest != null)
                     {
@@ -233,28 +234,35 @@ namespace OffTheRails.Tracks
 
             previewObject.transform.position = targetPos;
             previewObject.transform.rotation = targetRot;
+            
+            previewPositionValid = true;
         }
 
         private void DrawPreviewVisuals()
         {
-            if (previewObject == null) return;
+            if (previewObject == null || !previewPositionValid) return;
 
-            Tracks.TrackPiece previewTrack = previewObject.GetComponent<Tracks.TrackPiece>();
-            //TrackManager manager = FindObjectOfType<TrackManager>();
+            TrackPiece previewTrack = previewObject.GetComponent<TrackPiece>();
             TrackManager manager = FindFirstObjectByType<TrackManager>();
 
             if (previewTrack != null && manager != null)
             {
                 foreach (var connectionPoint in previewTrack.ConnectionPoints)
                 {
-                    ConnectionPoint nearest = connectionPoint.FindNearestValidConnection();
+                    // Guard: Only search if preview is actually positioned (not at origin)
+                    // This prevents searching when preview is freshly spawned
+                    if (previewTrack.transform.position.sqrMagnitude < 0.1f)
+                    {
+                        // Preview is at or near origin, skip connection checks
+                        continue;
+                    }
+
+                    ConnectionPoint nearest = connectionPoint.FindNearestConnectionForEditor();
 
                     if (nearest != null)
                     {
-                        // Re-calculate to verify snap (or cache it if performance is an issue, but this is cheap)
                         if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 snapPos, out Quaternion snapRot))
                         {
-                            // Visual feedback
                             Handles.color = Color.yellow;
                             Handles.DrawWireDisc(nearest.WorldPosition, Vector3.forward, 0.3f);
                             Handles.DrawLine(previewObject.transform.position, nearest.WorldPosition);
@@ -272,7 +280,7 @@ namespace OffTheRails.Tracks
             previewObject.hideFlags = HideFlags.HideAndDontSave; // Don't save in scene, don't show in hierarchy
 
             // Disable TrackPiece component to prevent registration
-            var trackPiece = previewObject.GetComponent<Tracks.TrackPiece>();
+            var trackPiece = previewObject.GetComponent<OffTheRails.Tracks.TrackPiece>();
             if (trackPiece != null) trackPiece.enabled = false;
 
             // Disable colliders
@@ -309,7 +317,7 @@ namespace OffTheRails.Tracks
                     if (connectionPoint.IsConnected)
                         continue;
 
-                    ConnectionPoint nearest = connectionPoint.FindNearestValidConnection();
+                    ConnectionPoint nearest = connectionPoint.FindNearestConnectionForEditor();
 
                     if (nearest != null)
                     {
@@ -340,41 +348,62 @@ namespace OffTheRails.Tracks
         private void PlaceTrack()
         {
             if (previewObject == null) return;
-
+        
             SerializedProperty prefabsProp = serializedObject.FindProperty("trackPrefabs");
             GameObject prefab =
                 (GameObject)prefabsProp.GetArrayElementAtIndex(selectedPrefabIndex).objectReferenceValue;
-
+        
             if (prefab != null)
             {
                 GameObject newTrack = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                 newTrack.transform.position = previewObject.transform.position;
                 newTrack.transform.rotation = previewObject.transform.rotation;
-
+        
                 // Set layer and sorting layer
                 string trackLayer = serializedObject.FindProperty("trackLayer").stringValue;
                 string trackSortingLayer = serializedObject.FindProperty("trackSortingLayer").stringValue;
-
+        
                 SetLayerRecursively(newTrack, LayerMask.NameToLayer(trackLayer));
                 foreach (var renderer in newTrack.GetComponentsInChildren<SpriteRenderer>())
                 {
                     renderer.sortingLayerName = trackSortingLayer;
                 }
-
+        
                 Undo.RegisterCreatedObjectUndo(newTrack, "Place Track");
-
-                // Try to snap using TrackManager if available
-                //TrackManager manager = FindObjectOfType<TrackManager>();
+        
+                // Try to snap the newly placed track
                 TrackManager manager = FindFirstObjectByType<TrackManager>();
-
                 if (manager != null)
                 {
                     manager.RefreshTracks();
-
-                    Tracks.TrackPiece piece = newTrack.GetComponent<Tracks.TrackPiece>();
+        
+                    TrackPiece piece = newTrack.GetComponent<TrackPiece>();
                     if (piece != null)
                     {
-                        manager.TrySnapTrack(piece);
+                        // Attempt to snap the newly placed track to nearby connections
+                        foreach (var connectionPoint in piece.ConnectionPoints)
+                        {
+                            ConnectionPoint nearest = connectionPoint.FindNearestConnectionForEditor();
+                            if (nearest != null)
+                            {
+                                if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 snapPos, out Quaternion snapRot))
+                                {
+                                    Undo.RecordObject(newTrack.transform, "Snap Placed Track");
+                                    newTrack.transform.position = snapPos;
+                                    newTrack.transform.rotation = snapRot;
+                                    
+                                    if (connectionPoint.CanConnectTo(nearest))
+                                    {
+                                        connectionPoint.ConnectTo(nearest);
+                                        EditorUtility.SetDirty(piece);
+                                        EditorUtility.SetDirty(nearest);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        manager.RegenerateAllPaths();
                     }
                 }
             }

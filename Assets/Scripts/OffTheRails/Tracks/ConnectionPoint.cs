@@ -37,7 +37,22 @@ namespace OffTheRails.Tracks
         /// <summary>
         /// The track piece this connection point belongs to
         /// </summary>
-        public TrackPiece ParentTrack { get; private set; }
+        /// <summary>
+        /// The track piece this connection point belongs to
+        /// </summary>
+        public TrackPiece ParentTrack 
+        { 
+            get
+            {
+                if (_parentTrack == null)
+                {
+                    _parentTrack = GetComponentInParent<TrackPiece>();
+                }
+                return _parentTrack;
+            }
+            private set => _parentTrack = value;
+        }
+        private TrackPiece _parentTrack;
 
         /// <summary>
         /// Whether this connection point is currently connected
@@ -123,7 +138,8 @@ namespace OffTheRails.Tracks
             bool directionsOK = dot <= -directionTolerance;
             
             Debug.Log($"CanConnectTo: Distance={distance:F3}, Dot={dot:F3}, Threshold={-directionTolerance:F3}, Result={directionsOK}");
-
+            Debug.Log($"My WorldPos: {WorldPosition}, Other WorldPos: {other.WorldPosition}");
+            Debug.Log($"My transform.position: {transform.position}, Other transform.position: {other.transform.position}");
             return directionsOK;
         }
 
@@ -183,13 +199,17 @@ namespace OffTheRails.Tracks
         /// <returns>The nearest valid connection point, or null if none found</returns>
         public ConnectionPoint FindNearestValidConnection()
         {
-            if (TrackManager.Instance == null)
+            var manager = TrackManager.GetInstance();
+            if (manager == null)
+            {
+                Debug.LogError("No TrackManager instance found!");
                 return null;
+            }
 
             ConnectionPoint nearest = null;
             float nearestDistance = float.MaxValue;
 
-            foreach (var track in TrackManager.Instance.GetAllTracks())
+            foreach (var track in manager.GetAllTracks())
             {
                 if (track == ParentTrack)
                     continue;
@@ -210,6 +230,69 @@ namespace OffTheRails.Tracks
 
             return nearest;
         }
+        
+        public ConnectionPoint FindNearestConnectionForEditor(float searchRadius = 3.0f)
+        {
+            var manager = TrackManager.GetInstance();
+            if (manager == null)
+            {
+                Debug.LogError("[Editor Search] TrackManager.GetInstance() returned NULL!");
+                return null;
+            }
+            
+            Debug.Log("[Editor Search] TrackManager found");
+            
+            ConnectionPoint nearest = null;
+            float nearestDistance = float.MaxValue;
+
+            int trackCount = 0;
+            foreach (var track in manager.GetAllTracks())
+            {
+                trackCount++;
+                if (track == ParentTrack)
+                {
+                    Debug.Log($"[Editor Search] Skipping {track.name} - same parent");
+                    continue;
+                }
+
+                Debug.Log($"[Editor Search] Checking track: {track.name}");
+
+                foreach (var point in track.ConnectionPoints)
+                {
+                    if (point == this)
+                    {
+                        continue;
+                    }
+                    
+                    if (point.IsConnected)
+                    {
+                        Debug.Log($"[Editor Search] {point.name} already connected, skipping");
+                        continue;
+                    }
+
+                    float distance = Vector2.Distance(WorldPosition, point.WorldPosition);
+                    Debug.Log($"[Editor Search] {point.name} distance={distance:F3}");
+    
+                    if (distance < searchRadius && distance < nearestDistance)
+                    {
+                        Debug.Log($"[Editor Search] ✓ New nearest: {point.name}");
+                        nearest = point;
+                        nearestDistance = distance;
+                    }
+                }
+            }
+            // THIS IS THE CRITICAL PART - ADD THIS!
+            if (nearest != null)
+            {
+                Debug.Log($"[Editor Search] RETURNING: {nearest.name} at {nearestDistance:F3}");
+            }
+            else
+            {
+                Debug.LogWarning($"[Editor Search] RETURNING: NULL (nothing within {searchRadius})");
+            }
+
+            return nearest;
+        }
 
         /// <summary>
         /// Calculate the position and rotation needed to align with another connection point
@@ -219,64 +302,68 @@ namespace OffTheRails.Tracks
         /// <param name="rotation">Output: The rotation for the parent track</param>
         /// <returns>True if alignment was calculated successfully</returns>
         public bool CalculateAlignmentTo(ConnectionPoint target, out Vector3 position, out Quaternion rotation)
-{
-    position = Vector3.zero;
-    rotation = Quaternion.identity;
-
-    if (target == null || ParentTrack == null)
-        return false;
-
-    // Get the target connection point's world direction
-    Vector2 targetDir = target.WorldDirection;
-    
-    // We want THIS connection point to face OPPOSITE to the target
-    Vector2 desiredWorldDir = -targetDir;
-    
-    // Current direction of this connection point in world space
-    Vector2 currentWorldDir = WorldDirection;
-    
-    // Calculate the angle between current direction and desired direction
-    float currentAngle = Mathf.Atan2(currentWorldDir.y, currentWorldDir.x) * Mathf.Rad2Deg;
-    float desiredAngle = Mathf.Atan2(desiredWorldDir.y, desiredWorldDir.x) * Mathf.Rad2Deg;
-    float rotationDelta = desiredAngle - currentAngle;
-    
-    // Apply this rotation delta to the parent track's current rotation
-    float newRotation = ParentTrack.transform.eulerAngles.z + rotationDelta;
-    rotation = Quaternion.Euler(0, 0, newRotation);
-
-    // Now calculate position
-    Vector2 targetPos = target.WorldPosition;
-    
-    // Calculate where our parent track needs to be
-    Vector2 localOffset = transform.localPosition;
-    
-    // Rotate this local offset by the new rotation
-    float angleRad = newRotation * Mathf.Deg2Rad;
-    float cos = Mathf.Cos(angleRad);
-    float sin = Mathf.Sin(angleRad);
-    Vector2 rotatedOffset = new Vector2(
-        localOffset.x * cos - localOffset.y * sin,
-        localOffset.x * sin + localOffset.y * cos
-    );
-    
-    // Parent position = target position - rotated offset
-    position = new Vector3(
-        targetPos.x - rotatedOffset.x, 
-        targetPos.y - rotatedOffset.y, 
-        ParentTrack.transform.position.z
-    );
-
-    // DEBUG VISUALIZATION
-    Debug.DrawLine(WorldPosition, target.WorldPosition, Color.yellow, 2f);
-    Debug.DrawLine(position, targetPos, Color.cyan, 2f);
-    Debug.Log($"[CalculateAlignment] {gameObject.name} → {target.gameObject.name}");
-    Debug.Log($"Target pos: {targetPos}, Our current pos: {WorldPosition}");
-    Debug.Log($"Local offset: {localOffset}, Rotated offset: {rotatedOffset}");
-    Debug.Log($"Final parent position: {position}");
-    Debug.Log($"Rotation: {ParentTrack.transform.eulerAngles.z:F1}° → {newRotation:F1}°");
-
-    return true;
-}
+        {
+            position = Vector3.zero;
+            rotation = Quaternion.identity;
+        
+            if (target == null || target == this || ParentTrack == null)
+            {
+                Debug.LogWarning($"CalculateAlignmentTo FAIL: target==null:{target == null}, target==this:{target == this}, ParentTrack==null:{ParentTrack == null}");;
+                return false;
+            }
+                
+        
+            // Get the target connection point's world direction
+            Vector2 targetDir = target.WorldDirection;
+            
+            // We want THIS connection point to face OPPOSITE to the target
+            Vector2 desiredWorldDir = -targetDir;
+            
+            // Current direction of this connection point in world space
+            Vector2 currentWorldDir = WorldDirection;
+            
+            // Calculate the angle between current direction and desired direction
+            float currentAngle = Mathf.Atan2(currentWorldDir.y, currentWorldDir.x) * Mathf.Rad2Deg;
+            float desiredAngle = Mathf.Atan2(desiredWorldDir.y, desiredWorldDir.x) * Mathf.Rad2Deg;
+            float rotationDelta = desiredAngle - currentAngle;
+            
+            // Apply this rotation delta to the parent track's current rotation
+            float newRotation = ParentTrack.transform.eulerAngles.z + rotationDelta;
+            rotation = Quaternion.Euler(0, 0, newRotation);
+        
+            // Now calculate position
+            Vector2 targetPos = target.WorldPosition;
+            
+            // Calculate where our parent track needs to be
+            Vector2 localOffset = transform.localPosition;
+            
+            // Rotate this local offset by the new rotation
+            float angleRad = newRotation * Mathf.Deg2Rad;
+            float cos = Mathf.Cos(angleRad);
+            float sin = Mathf.Sin(angleRad);
+            Vector2 rotatedOffset = new Vector2(
+                localOffset.x * cos - localOffset.y * sin,
+                localOffset.x * sin + localOffset.y * cos
+            );
+            
+            // Parent position = target position - rotated offset
+            position = new Vector3(
+                targetPos.x - rotatedOffset.x, 
+                targetPos.y - rotatedOffset.y, 
+                ParentTrack.transform.position.z
+            );
+        
+            // DEBUG VISUALIZATION
+            Debug.DrawLine(WorldPosition, target.WorldPosition, Color.yellow, 2f);
+            Debug.DrawLine(position, targetPos, Color.cyan, 2f);
+            Debug.Log($"[CalculateAlignment] {gameObject.name} → {target.gameObject.name}");
+            Debug.Log($"Target pos: {targetPos}, Our current pos: {WorldPosition}");
+            Debug.Log($"Local offset: {localOffset}, Rotated offset: {rotatedOffset}");
+            Debug.Log($"Final parent position: {position}");
+            Debug.Log($"Rotation: {ParentTrack.transform.eulerAngles.z:F1}° → {newRotation:F1}°");
+        
+            return true;
+        }
 
         private void OnDrawGizmos()
         {
@@ -327,39 +414,6 @@ namespace OffTheRails.Tracks
             // Draw enhanced gizmos when selected
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(transform.position, gizmoSize * 1.5f);
-        }
-
-        public ConnectionPoint FindNearestConnectionForSnapping(float searchRadius = 3.0f)
-        {
-            if (TrackManager.Instance == null)
-                return null;
-
-            ConnectionPoint nearest = null;
-            float nearestDistance = float.MaxValue;
-
-            foreach (var track in TrackManager.Instance.GetAllTracks())
-            {
-                if (track == ParentTrack)
-                    continue;
-
-                foreach (var point in track.ConnectionPoints)
-                {
-                    // Skip same parent track
-                    if (point.ParentTrack == ParentTrack)
-                        continue;
-
-                    // Check distance only (no direction check, no "already connected" check)
-                    float distance = Vector2.Distance(WorldPosition, point.WorldPosition);
-            
-                    if (distance < searchRadius && distance < nearestDistance)
-                    {
-                        nearest = point;
-                        nearestDistance = distance;
-                    }
-                }
-            }
-
-            return nearest;
         }
 #endif
     }

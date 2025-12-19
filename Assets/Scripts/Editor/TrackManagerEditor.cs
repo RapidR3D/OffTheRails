@@ -1,87 +1,131 @@
-using UnityEngine;
-using UnityEditor;
 using OffTheRails.Tracks;
+using UnityEditor;
+using UnityEngine;
 
-[CustomEditor(typeof(TrackManager))]
-public class TrackManagerEditor : Editor
+namespace Editor
 {
-    private TrackManager manager;
-
-    private void OnEnable()
+    [CustomEditor(typeof(TrackManager))]
+    public class TrackManagerEditor : UnityEditor.Editor
     {
-        manager = (TrackManager)target;
-    }
+        private TrackManager manager;
 
-    public override void OnInspectorGUI()
-    {
-        DrawDefaultInspector();
-
-        EditorGUILayout.LabelField("Editor Tools", EditorStyles.boldLabel);
-
-        if (GUILayout.Button("Snap All Tracks"))
+        private void OnEnable()
         {
-            SnapAllTracksWithUndo();
+            manager = (TrackManager)target;
         }
 
-        if (GUILayout.Button("Regenerate Paths"))
+        public override void OnInspectorGUI()
         {
-            manager.RegenerateAllPaths();
-            SceneView.RepaintAll();
-        }
-    }
+            DrawDefaultInspector();
 
-    private void SnapAllTracksWithUndo()
-    {
-        manager.RefreshTracks();
-        var tracks = manager.GetAllTracks();
-        int snapCount = 0;
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Editor Tools", EditorStyles.boldLabel);
 
-        foreach (var track in tracks)
-        {
-            bool snapped = false;
-            
-            foreach (var connectionPoint in track.ConnectionPoints)
+            if (GUILayout.Button("Snap All Tracks"))
             {
-                if (connectionPoint.IsConnected)
-                {
-                    connectionPoint.Disconnect();
-                }
+                SnapAllTracksWithUndo();
+            }
 
-                // Use LOOSER search
-                ConnectionPoint nearest = connectionPoint.FindNearestConnectionForSnapping(3.0f);
+            if (GUILayout.Button("Regenerate Paths"))
+            {
+                manager.RegenerateAllPaths();
+                EditorUtility.SetDirty(manager);
+                SceneView.RepaintAll();
+            }
+            
+            EditorGUILayout.Space();
+            EditorGUILayout.HelpBox("Snap All Tracks works in both Edit and Play mode", MessageType.Info);
+        }
 
-                if (nearest != null)
+        private void SnapAllTracksWithUndo()
+        {
+            if (manager == null) return;
+        
+            manager.RefreshTracks();
+            var tracks = manager.GetAllTracks();
+            
+            if (tracks == null)
+            {
+                Debug.LogWarning("No tracks found.");
+                return;
+            }
+        
+            int snapCount = 0;
+        
+            foreach (var track in tracks)
+            {
+                if (track == null) continue;
+        
+                bool snapped = false;
+        
+                foreach (var connectionPoint in track.ConnectionPoints)
                 {
-                    if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 position, out Quaternion rotation))
+                    if (connectionPoint == null) continue;
+        
+                    // Disconnect if already connected
+                    if (connectionPoint.IsConnected)
                     {
-                        Undo.RecordObject(track.transform, "Snap Track");
+                        Undo.RecordObject(connectionPoint, "Disconnect Track");
+                        connectionPoint.Disconnect();
+                    }
+        
+                    // Find nearest connection
+                    ConnectionPoint nearest = connectionPoint.FindNearestConnectionForEditor(5.0f);
+        
+                    if (nearest != null)
+                    {
+                        Debug.Log($"Found nearest for {connectionPoint.name}: {nearest.name}");
                         
-                        track.transform.position = position;
-                        track.transform.rotation = rotation;
-
-                        if (connectionPoint.CanConnectTo(nearest))
+                        if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 position, out Quaternion rotation))
                         {
-                            connectionPoint.ConnectTo(nearest);
-                            snapped = true;
-                            snapCount++;
+                            Debug.Log($"Alignment calculated successfully");
+                            // Record undo
+                            Undo.RecordObject(track.transform, "Snap Track");
+                            Undo.RecordObject(connectionPoint, "Connect Track");
+                            Undo.RecordObject(nearest, "Connect Track");
+        
+                            // Apply transform
+                            track.transform.position = position;
+                            track.transform.rotation = rotation;
+        
+                            // Try to connect
+                            if (connectionPoint.CanConnectTo(nearest, skipDirectionCheck: true))
+                            {
+                                connectionPoint.ConnectTo(nearest);
+                                snapped = true;
+                                
+                                // Mark dirty for edit mode
+                                EditorUtility.SetDirty(track);
+                                EditorUtility.SetDirty(connectionPoint);
+                                EditorUtility.SetDirty(nearest);
+                                
+                                Debug.Log($"Snapped {track.name} to {nearest.ParentTrack.name}");
+                            }
+        
+                            break; // Only snap one connection per track
                         }
-                        
-                        break; 
+                        else
+                        {
+                            Debug.LogWarning($"CalculateAlignmentTo FAILED for {connectionPoint.name} -> {nearest.name}");
+                        }
                     }
                 }
+        
+                if (snapped)
+                    snapCount++;
             }
-        }
-
-        if (snapCount > 0)
-        {
-            Debug.Log($"✓ Snapped {snapCount} tracks");
-            manager.RegenerateAllPaths();
-            SceneView.RepaintAll();
-        }
-        else
-        {
-            Debug.LogWarning("No tracks could be snapped");
+        
+            if (snapCount > 0)
+            {
+                Debug.Log($"✓ Snapped {snapCount} tracks");
+                manager.RegenerateAllPaths();
+                EditorUtility.SetDirty(manager);
+                SceneView.RepaintAll();
+            }
+            else
+            {
+                Debug.LogWarning("No tracks could be snapped. Make sure tracks are within 5 units of each other.");
+            }
         }
     }
 }
-
