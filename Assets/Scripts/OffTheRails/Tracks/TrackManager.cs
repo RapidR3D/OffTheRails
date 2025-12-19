@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using OffTheRails.Tracks;
 
 namespace OffTheRails.Tracks
 {
@@ -7,9 +8,11 @@ namespace OffTheRails.Tracks
     /// Singleton manager that handles all track pieces and their connections.
     /// Manages snapping logic and path generation.
     /// </summary>
+    [ExecuteAlways]
     public class TrackManager : MonoBehaviour
     {
         private static TrackManager instance;
+        private static bool isQuitting = false;
 
         /// <summary>
         /// Singleton instance of the TrackManager
@@ -18,9 +21,14 @@ namespace OffTheRails.Tracks
         {
             get
             {
+                if (isQuitting)
+                {
+                    return null;
+                }
+
                 if (instance == null)
                 {
-                    instance = FindObjectOfType<TrackManager>();
+                    instance = FindFirstObjectByType<TrackManager>();
                     
                     if (instance == null)
                     {
@@ -65,17 +73,48 @@ namespace OffTheRails.Tracks
         /// </summary>
         public float DefaultSnapRadius => defaultSnapRadius;
 
+        /// <summary>
+        /// Check if an instance of TrackManager exists
+        /// </summary>
+        public static bool HasInstance
+        {
+            get
+            {
+                if (isQuitting) return false;
+                return instance != null;
+            }
+        }
+
         private void Awake()
         {
             // Enforce singleton pattern
             if (instance != null && instance != this)
             {
-                Debug.LogWarning("Multiple TrackManager instances detected. Destroying duplicate.");
-                Destroy(gameObject);
-                return;
+                // In Edit Mode, we might have duplicates temporarily, but we should clean up
+                if (Application.isPlaying)
+                {
+                    Debug.LogWarning("Multiple TrackManager instances detected. Destroying duplicate.");
+                    Destroy(gameObject);
+                    return;
+                }
             }
 
             instance = this;
+        }
+
+        private void OnEnable()
+        {
+            if (!Application.isPlaying)
+            {
+                RefreshTracks();
+                RebuildConnections();
+                RegenerateAllPaths();
+            }
+        }
+
+        private void OnApplicationQuit()
+        {
+            isQuitting = true;
         }
 
         /// <summary>
@@ -136,12 +175,84 @@ namespace OffTheRails.Tracks
         }
 
         /// <summary>
+        /// Refresh the list of tracks from the scene (useful for Editor tools)
+        /// </summary>
+        public void RefreshTracks()
+        {
+            allTracks.Clear();
+            TrackPiece[] tracks = FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
+            foreach (var track in tracks)
+            {
+                RegisterTrack(track);
+            }
+        }
+
+        /// <summary>
+        /// Rebuild connections between tracks based on proximity
+        /// </summary>
+        public void RebuildConnections()
+        {
+            foreach (var track in allTracks)
+            {
+                foreach (var point in track.ConnectionPoints)
+                {
+                    if (point.IsConnected)
+                        continue;
+
+                    // Find matching connection
+                    foreach (var otherTrack in allTracks)
+                    {
+                        if (otherTrack == track) continue;
+
+                        foreach (var otherPoint in otherTrack.ConnectionPoints)
+                        {
+                            if (otherPoint.IsConnected) continue;
+
+                            // Check if they are effectively in the same position
+                            if (Vector2.Distance(point.WorldPosition, otherPoint.WorldPosition) < 0.01f)
+                            {
+                                // Check alignment
+                                float dot = Vector2.Dot(point.WorldDirection, otherPoint.WorldDirection);
+                                if (dot <= -0.9f) // Roughly opposite
+                                {
+                                    point.ConnectTo(otherPoint);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Get all generated paths
         /// </summary>
         /// <returns>List of all paths</returns>
         public List<TrackPath> GetAllPaths()
         {
             return new List<TrackPath>(allPaths);
+        }
+
+        /// <summary>
+        /// Attempt to snap all tracks in the scene
+        /// </summary>
+        public void SnapAllTracks()
+        {
+            RefreshTracks();
+            int snapCount = 0;
+            foreach (var track in allTracks)
+            {
+                if (TrySnapTrack(track))
+                {
+                    snapCount++;
+                }
+            }
+            
+            if (snapCount > 0)
+            {
+                Debug.Log($"Snapped {snapCount} tracks.");
+                RegenerateAllPaths();
+            }
         }
 
         /// <summary>
@@ -380,7 +491,7 @@ namespace OffTheRails.Tracks
         private static void CreateTrackManager()
         {
             // Check if one already exists
-            TrackManager existing = FindObjectOfType<TrackManager>();
+            TrackManager existing = FindFirstObjectByType<TrackManager>();
             if (existing != null)
             {
                 UnityEditor.Selection.activeGameObject = existing.gameObject;

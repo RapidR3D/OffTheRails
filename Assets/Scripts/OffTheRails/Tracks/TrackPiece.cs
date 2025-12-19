@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using OffTheRails.Tracks;
 
 namespace OffTheRails.Tracks
 {
@@ -18,27 +19,29 @@ namespace OffTheRails.Tracks
     /// Base component for all track segments.
     /// Stores connection points, track type, and path waypoints.
     /// </summary>
+    [ExecuteAlways]
     public class TrackPiece : MonoBehaviour
     {
-        [Header("Track Configuration")]
-        [Tooltip("Type of this track piece")]
-        [SerializeField] private TrackType trackType = TrackType.Straight;
+        [Header("Track Configuration")] [Tooltip("Type of this track piece")] [SerializeField]
+        private TrackType trackType = TrackType.Straight;
 
-        [Tooltip("Waypoints along this track piece for trains to follow (in local space)")]
-        [SerializeField] private List<Vector2> localWaypoints = new List<Vector2>();
+        [Tooltip("Waypoints along this track piece for trains to follow (in local space)")] [SerializeField]
+        private List<Vector2> localWaypoints = new List<Vector2>();
 
-        [Tooltip("Should waypoints be auto-generated based on connection points?")]
-        [SerializeField] private bool autoGenerateWaypoints = true;
+        [Tooltip("Should waypoints be auto-generated based on connection points?")] [SerializeField]
+        private bool autoGenerateWaypoints = true;
 
-        [Tooltip("Number of waypoints to generate for curved tracks")]
-        [SerializeField] private int curvedWaypointCount = 10;
+        [Tooltip("Number of waypoints to generate for curved tracks")] [SerializeField]
+        private int curvedWaypointCount = 10;
 
-        [Header("Visual Settings")]
-        [Tooltip("Show waypoint gizmos in scene view")]
-        [SerializeField] private bool showWaypointGizmos = true;
+        [Tooltip("Control point strength for bezier curves (0-1 relative to distance)")] [SerializeField]
+        private float bezierControlStrength = 0.33f;
 
-        [Tooltip("Color for waypoint gizmos")]
-        [SerializeField] private Color waypointColor = Color.cyan;
+        [Header("Visual Settings")] [Tooltip("Show waypoint gizmos in scene view")] [SerializeField]
+        private bool showWaypointGizmos = true;
+
+        [Tooltip("Color for waypoint gizmos")] [SerializeField]
+        private Color waypointColor = Color.cyan;
 
         /// <summary>
         /// Unique identifier for this track piece
@@ -55,6 +58,11 @@ namespace OffTheRails.Tracks
         /// </summary>
         public ConnectionPoint[] ConnectionPoints { get; private set; }
 
+        /// <summary>
+        /// Optional switch component for junctions
+        /// </summary>
+        public TrackSwitch TrackSwitch { get; private set; }
+
         // Cached world waypoints
         private Vector2[] cachedWorldWaypoints = null;
         private Vector3 lastCachedPosition;
@@ -68,9 +76,9 @@ namespace OffTheRails.Tracks
             get
             {
                 // Recalculate if transform changed or cache is invalid
-                if (cachedWorldWaypoints == null || 
+                if (cachedWorldWaypoints == null ||
                     cachedWorldWaypoints.Length != localWaypoints.Count ||
-                    transform.position != lastCachedPosition || 
+                    transform.position != lastCachedPosition ||
                     transform.rotation != lastCachedRotation)
                 {
                     cachedWorldWaypoints = new Vector2[localWaypoints.Count];
@@ -78,9 +86,11 @@ namespace OffTheRails.Tracks
                     {
                         cachedWorldWaypoints[i] = transform.TransformPoint(localWaypoints[i]);
                     }
+
                     lastCachedPosition = transform.position;
                     lastCachedRotation = transform.rotation;
                 }
+
                 return cachedWorldWaypoints;
             }
         }
@@ -103,6 +113,7 @@ namespace OffTheRails.Tracks
                 {
                     length += Vector2.Distance(worldPoints[i - 1], worldPoints[i]);
                 }
+
                 return length;
             }
         }
@@ -114,6 +125,7 @@ namespace OffTheRails.Tracks
 
             // Find all connection points
             ConnectionPoints = GetComponentsInChildren<ConnectionPoint>();
+            TrackSwitch = GetComponent<TrackSwitch>();
 
             if (ConnectionPoints.Length == 0)
             {
@@ -121,7 +133,7 @@ namespace OffTheRails.Tracks
             }
 
             // Auto-generate waypoints if needed
-            if (autoGenerateWaypoints && localWaypoints.Count == 0)
+            if (autoGenerateWaypoints)
             {
                 GenerateWaypoints();
             }
@@ -130,18 +142,35 @@ namespace OffTheRails.Tracks
         private void OnEnable()
         {
             // Register with track manager
-            if (TrackManager.Instance != null)
+            var trackManager = TrackManager.Instance;
+            if (trackManager != null)
             {
-                TrackManager.Instance.RegisterTrack(this);
+                trackManager.RegisterTrack(this);
             }
         }
 
         private void OnDisable()
-        {
-            // Unregister from track manager
-            if (TrackManager.Instance != null)
             {
-                TrackManager.Instance.UnregisterTrack(this);
+                // Unregister from track manager
+                if (this == null || gameObject == null) return;
+    
+                var trackManager = TrackManager.Instance;
+                if (trackManager != null)
+                {
+                    trackManager.UnregisterTrack(this);
+                }
+    
+                if (!Application.isPlaying && gameObject != null)
+                {
+                    Debug.Log($"Disabling {gameObject.name} ({TrackID})");
+                }
+            }
+
+        private void OnValidate()
+        {
+            if (autoGenerateWaypoints && ConnectionPoints != null && ConnectionPoints.Length >= 2)
+            {
+                GenerateWaypoints();
             }
         }
 
@@ -169,13 +198,12 @@ namespace OffTheRails.Tracks
                     break;
 
                 case TrackType.Curved:
-                    GenerateCurvedWaypoints(start, end);
+                    // Use Bezier for better curve handling
+                    GenerateBezierWaypoints(ConnectionPoints[0], ConnectionPoints[1]);
                     break;
 
                 case TrackType.Junction:
-                    // For junctions, we'd need more complex logic
-                    // For now, just create a straight path
-                    GenerateStraightWaypoints(start, end);
+                    GenerateJunctionWaypoints();
                     break;
             }
         }
@@ -186,65 +214,99 @@ namespace OffTheRails.Tracks
             localWaypoints.Add(end);
         }
 
-        private void GenerateCurvedWaypoints(Vector2 start, Vector2 end)
+        private void GenerateJunctionWaypoints()
         {
-            // Create a 90-degree curve
-            // Assume the curve goes from start to end with a circular arc
-            
-            // Find the center point of the curve
-            // For a 90-degree curve, the center is equidistant from start and end
-            Vector2 midpoint = (start + end) / 2f;
-            Vector2 direction = (end - start).normalized;
-            Vector2 perpendicular = new Vector2(-direction.y, direction.x);
-            
-            // The center is offset perpendicular to the line between start and end
-            float radius = Vector2.Distance(start, end) / Mathf.Sqrt(2);
-            Vector2 center = midpoint + perpendicular * (radius / Mathf.Sqrt(2));
+            if (ConnectionPoints.Length < 3)
+            {
+                Debug.LogWarning("Junction needs at least 3 connection points");
+                return;
+            }
 
-            // Generate waypoints along the arc
-            localWaypoints.Add(start);
+            // Assume Point 0 is the common point (Input)
+            // Point 1 is Option A (Green/Straight)
+            // Point 2 is Option B (Yellow/Diverging)
+            // This might need adjustment based on specific prefab setup
+            
+            ConnectionPoint startPoint = ConnectionPoints[0];
+            ConnectionPoint endPoint = ConnectionPoints[1]; // Default to Green
+
+            if (TrackSwitch != null && TrackSwitch.IsDiverging)
+            {
+                endPoint = ConnectionPoints[2]; // Switch to Yellow
+            }
+
+            GenerateBezierWaypoints(startPoint, endPoint);
+        }
+
+        private void GenerateBezierWaypoints(ConnectionPoint startCP, ConnectionPoint endCP)
+        {
+            Vector2 start = transform.InverseTransformPoint(startCP.transform.position);
+            Vector2 end = transform.InverseTransformPoint(endCP.transform. position);
+    
+            // Get directions in local space
+            // For connection points: they should point in the direction a train would ENTER/EXIT
+            Vector2 startDir = transform.InverseTransformDirection(startCP.WorldDirection);
+            Vector2 endDir = transform.InverseTransformDirection(endCP.WorldDirection);
+
+            float distance = Vector2.Distance(start, end);
+            float controlLength = distance * Mathf.Abs(bezierControlStrength); // Use absolute value
+
+            Vector2 p0 = start;
+            Vector2 p3 = end;
+            
+            // Control points should extend from connection points in the direction of the curve
+            Vector2 p1 = p0 + startDir * controlLength; // the + is the correct operation here, subtracting generating the bezier curve outside the confines of the track
+            Vector2 p2 = p3 + endDir * controlLength;
+
+            localWaypoints.Add(p0);
 
             for (int i = 1; i < curvedWaypointCount - 1; i++)
             {
                 float t = (float)i / (curvedWaypointCount - 1);
-                float angle = t * 90f * Mathf.Deg2Rad;
-
-                // Calculate point on the arc
-                Vector2 startDir = (start - center).normalized;
-                Vector2 endDir = (end - center).normalized;
-
-                // Interpolate angle
-                float startAngle = Mathf.Atan2(startDir.y, startDir.x);
-                float endAngle = Mathf.Atan2(endDir.y, endDir.x);
-                
-                // Handle angle wrapping
-                if (Mathf.Abs(endAngle - startAngle) > Mathf.PI)
-                {
-                    if (endAngle < startAngle)
-                        endAngle += 2 * Mathf.PI;
-                    else
-                        startAngle += 2 * Mathf.PI;
-                }
-
-                float currentAngle = Mathf.Lerp(startAngle, endAngle, t);
-                Vector2 point = center + new Vector2(Mathf.Cos(currentAngle), Mathf.Sin(currentAngle)) * radius;
-
+                Vector2 point = CalculateCubicBezier(t, p0, p1, p2, p3);
                 localWaypoints.Add(point);
             }
 
-            localWaypoints.Add(end);
+            localWaypoints.Add(p3);
+        }
+
+        private Vector2 CalculateCubicBezier(float t, Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3)
+        {
+            float u = 1 - t;
+            float tt = t * t;
+            float uu = u * u;
+            float uuu = uu * u;
+            float ttt = tt * t;
+
+            Vector2 p = uuu * p0;
+            p += 3 * uu * t * p1;
+            p += 3 * u * tt * p2;
+            p += ttt * p3;
+
+            return p;
         }
 
         /// <summary>
-        /// Get the connected track pieces
+        /// Get the connected track pieces, respecting switch state
         /// </summary>
         /// <returns>List of connected track pieces</returns>
         public List<TrackPiece> GetConnectedTracks()
         {
             List<TrackPiece> connected = new List<TrackPiece>();
 
-            foreach (var connectionPoint in ConnectionPoints)
+            for (int i = 0; i < ConnectionPoints.Length; i++)
             {
+                // Skip inactive connection points for junctions
+                if (trackType == TrackType.Junction && TrackSwitch != null)
+                {
+                    // Assume 0 is common, 1 is Green, 2 is Yellow
+                    // If Diverging (Yellow), skip 1 (Green)
+                    // If Straight (Green), skip 2 (Yellow)
+                    if (TrackSwitch.IsDiverging && i == 1) continue;
+                    if (!TrackSwitch.IsDiverging && i == 2) continue;
+                }
+
+                var connectionPoint = ConnectionPoints[i];
                 if (connectionPoint.IsConnected && connectionPoint.ConnectedTo != null)
                 {
                     TrackPiece connectedTrack = connectionPoint.ConnectedTo.ParentTrack;
@@ -321,7 +383,7 @@ namespace OffTheRails.Tracks
                 Gizmos.DrawWireSphere(worldPoints[i], 0.15f);
                 
                 // Draw waypoint numbers
-                UnityEditor.Handles.Label(worldPoints[i], i.ToString());
+                // UnityEditor.Handles.Label(worldPoints[i], i.ToString());
             }
         }
 

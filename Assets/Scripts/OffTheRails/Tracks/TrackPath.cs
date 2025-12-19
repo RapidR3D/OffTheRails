@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OffTheRails.Tracks;
 using UnityEngine;
 
 namespace OffTheRails.Tracks
@@ -154,52 +155,70 @@ namespace OffTheRails.Tracks
             if (TrackPieces.Count == 0)
                 return;
 
-            // For a simple connected path, we need to order the tracks correctly
-            // and combine their waypoints without duplicating connection points
+            // 1. Build adjacency map and calculate in-degrees restricted to this path's tracks
+            Dictionary<TrackPiece, List<TrackPiece>> adjacency = new Dictionary<TrackPiece, List<TrackPiece>>();
+            Dictionary<TrackPiece, int> inDegree = new Dictionary<TrackPiece, int>();
+            HashSet<TrackPiece> trackSet = new HashSet<TrackPiece>(TrackPieces);
 
-            // Start with the first track
-            TrackPiece currentTrack = TrackPieces[0];
-            HashSet<TrackPiece> processed = new HashSet<TrackPiece>();
-            List<TrackPiece> orderedTracks = new List<TrackPiece>();
-
-            // Build ordered list of tracks
-            orderedTracks.Add(currentTrack);
-            processed.Add(currentTrack);
-
-            while (orderedTracks.Count < TrackPieces.Count)
+            foreach (var track in TrackPieces)
             {
-                bool foundNext = false;
+                adjacency[track] = new List<TrackPiece>();
+                if (!inDegree.ContainsKey(track)) inDegree[track] = 0;
 
-                foreach (var connected in currentTrack.GetConnectedTracks())
+                foreach (var connected in track.GetConnectedTracks())
                 {
-                    if (!processed.Contains(connected) && TrackPieces.Contains(connected))
+                    if (trackSet.Contains(connected))
                     {
-                        orderedTracks.Add(connected);
-                        processed.Add(connected);
-                        currentTrack = connected;
-                        foundNext = true;
-                        break;
-                    }
-                }
-
-                if (!foundNext)
-                {
-                    // No more connected tracks in sequence, might be a branch or disconnected
-                    // Add remaining unprocessed tracks
-                    foreach (var track in TrackPieces)
-                    {
-                        if (!processed.Contains(track))
-                        {
-                            orderedTracks.Add(track);
-                            processed.Add(track);
-                            currentTrack = track;
-                            break;
-                        }
+                        adjacency[track].Add(connected);
+                        
+                        if (!inDegree.ContainsKey(connected)) inDegree[connected] = 0;
+                        inDegree[connected]++;
                     }
                 }
             }
 
-            // Combine waypoints from ordered tracks
+            // 2. Find start node (min in-degree)
+            TrackPiece startTrack = TrackPieces[0];
+            int minInDegree = int.MaxValue;
+
+            foreach (var kvp in inDegree)
+            {
+                if (kvp.Value < minInDegree)
+                {
+                    minInDegree = kvp.Value;
+                    startTrack = kvp.Key;
+                }
+            }
+
+            // 3. Traverse to build ordered list
+            List<TrackPiece> orderedTracks = new List<TrackPiece>();
+            HashSet<TrackPiece> processed = new HashSet<TrackPiece>();
+            
+            TrackPiece current = startTrack;
+            
+            while (current != null)
+            {
+                orderedTracks.Add(current);
+                processed.Add(current);
+
+                // Find next
+                TrackPiece next = null;
+                if (adjacency.ContainsKey(current))
+                {
+                    foreach (var neighbor in adjacency[current])
+                    {
+                        if (!processed.Contains(neighbor))
+                        {
+                            next = neighbor;
+                            break;
+                        }
+                    }
+                }
+                
+                current = next;
+            }
+
+            // 4. Combine waypoints from ordered tracks
             for (int i = 0; i < orderedTracks.Count; i++)
             {
                 Vector2[] trackWaypoints = orderedTracks[i].WorldWaypoints;

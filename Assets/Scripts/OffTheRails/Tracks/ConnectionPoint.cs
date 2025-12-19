@@ -1,9 +1,10 @@
 using UnityEngine;
+using OffTheRails.Tracks;
 
 namespace OffTheRails.Tracks
 {
     /// <summary>
-    /// Represents a connection point on a track piece where tracks can snap together.
+    /// Represents a connection point on a track piece where tracks can snap together. 
     /// Handles snap detection, validation, and visual feedback.
     /// </summary>
     public class ConnectionPoint : MonoBehaviour
@@ -85,7 +86,7 @@ namespace OffTheRails.Tracks
         /// </summary>
         /// <param name="other">The other connection point to check</param>
         /// <returns>True if connection is valid</returns>
-        public bool CanConnectTo(ConnectionPoint other)
+        public bool CanConnectTo(ConnectionPoint other, bool skipDirectionCheck = false)
         {
             if (other == null || other == this)
                 return false;
@@ -101,15 +102,29 @@ namespace OffTheRails.Tracks
             // Check if within snap radius
             float distance = Vector2.Distance(WorldPosition, other.WorldPosition);
             if (distance > snapRadius)
+            {
+                Debug.Log($"CanConnectTo FAIL: Distance {distance:F3} > {snapRadius}");
                 return false;
+            }
+            
+            // skip direction check if requested (after alignment calculation)
+            if (skipDirectionCheck)
+            {
+                Debug.Log($"CanConnectTo SUCCESS: Direction check skipped, distance OK ({distance:F3})");
+                return true;
+            }
+                
 
             // Check if directions are opposite (or nearly opposite)
             Vector2 thisDir = WorldDirection;
             Vector2 otherDir = other.WorldDirection;
             float dot = Vector2.Dot(thisDir, otherDir);
+            
+            bool directionsOK = dot <= -directionTolerance;
+            
+            Debug.Log($"CanConnectTo: Distance={distance:F3}, Dot={dot:F3}, Threshold={-directionTolerance:F3}, Result={directionsOK}");
 
-            // Directions should be opposite (dot product ≈ -1)
-            return dot <= -directionTolerance;
+            return directionsOK;
         }
 
         /// <summary>
@@ -118,16 +133,33 @@ namespace OffTheRails.Tracks
         /// <param name="other">The connection point to connect to</param>
         public void ConnectTo(ConnectionPoint other)
         {
-            if (!CanConnectTo(other))
+            // Don't check CanConnectTo here if we're being called after alignment
+            // The caller should have already validated
+    
+            if (other == null || other == this)
             {
-                Debug.LogWarning($"Cannot connect {gameObject.name} to {other.gameObject.name}");
+                Debug.LogWarning($"Cannot connect: invalid target");
+                return;
+            }
+
+            if (IsConnected || other.IsConnected)
+            {
+                Debug.LogWarning($"Cannot connect: already connected");
+                return;
+            }
+            
+            // Safety check: verify they're actually close
+            float distance = Vector2.Distance(WorldPosition, other.WorldPosition);
+            if (distance > 0.5f)
+            {
+                Debug.LogWarning($"Cannot connect {gameObject.name} to {other.gameObject.name}: too far apart ({distance:F3} units)");
                 return;
             }
 
             ConnectedTo = other;
             other.ConnectedTo = this;
 
-            Debug.Log($"Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
+            Debug.Log($"✓ Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
         }
 
         /// <summary>
@@ -187,40 +219,64 @@ namespace OffTheRails.Tracks
         /// <param name="rotation">Output: The rotation for the parent track</param>
         /// <returns>True if alignment was calculated successfully</returns>
         public bool CalculateAlignmentTo(ConnectionPoint target, out Vector3 position, out Quaternion rotation)
-        {
-            position = Vector3.zero;
-            rotation = Quaternion.identity;
+{
+    position = Vector3.zero;
+    rotation = Quaternion.identity;
 
-            if (target == null || ParentTrack == null)
-                return false;
+    if (target == null || ParentTrack == null)
+        return false;
 
-            // Calculate the offset from this connection point to the track's transform
-            Vector2 localOffset = transform.localPosition;
+    // Get the target connection point's world direction
+    Vector2 targetDir = target.WorldDirection;
+    
+    // We want THIS connection point to face OPPOSITE to the target
+    Vector2 desiredWorldDir = -targetDir;
+    
+    // Current direction of this connection point in world space
+    Vector2 currentWorldDir = WorldDirection;
+    
+    // Calculate the angle between current direction and desired direction
+    float currentAngle = Mathf.Atan2(currentWorldDir.y, currentWorldDir.x) * Mathf.Rad2Deg;
+    float desiredAngle = Mathf.Atan2(desiredWorldDir.y, desiredWorldDir.x) * Mathf.Rad2Deg;
+    float rotationDelta = desiredAngle - currentAngle;
+    
+    // Apply this rotation delta to the parent track's current rotation
+    float newRotation = ParentTrack.transform.eulerAngles.z + rotationDelta;
+    rotation = Quaternion.Euler(0, 0, newRotation);
 
-            // Target position is where the target connection point is
-            Vector2 targetPos = target.WorldPosition;
+    // Now calculate position
+    Vector2 targetPos = target.WorldPosition;
+    
+    // Calculate where our parent track needs to be
+    Vector2 localOffset = transform.localPosition;
+    
+    // Rotate this local offset by the new rotation
+    float angleRad = newRotation * Mathf.Deg2Rad;
+    float cos = Mathf.Cos(angleRad);
+    float sin = Mathf.Sin(angleRad);
+    Vector2 rotatedOffset = new Vector2(
+        localOffset.x * cos - localOffset.y * sin,
+        localOffset.x * sin + localOffset.y * cos
+    );
+    
+    // Parent position = target position - rotated offset
+    position = new Vector3(
+        targetPos.x - rotatedOffset.x, 
+        targetPos.y - rotatedOffset.y, 
+        ParentTrack.transform.position.z
+    );
 
-            // Calculate rotation needed to align directions (opposite)
-            Vector2 targetDir = target.WorldDirection;
-            float targetAngle = Mathf.Atan2(targetDir.y, targetDir.x) * Mathf.Rad2Deg;
-            float desiredAngle = targetAngle + 180f; // Opposite direction
+    // DEBUG VISUALIZATION
+    Debug.DrawLine(WorldPosition, target.WorldPosition, Color.yellow, 2f);
+    Debug.DrawLine(position, targetPos, Color.cyan, 2f);
+    Debug.Log($"[CalculateAlignment] {gameObject.name} → {target.gameObject.name}");
+    Debug.Log($"Target pos: {targetPos}, Our current pos: {WorldPosition}");
+    Debug.Log($"Local offset: {localOffset}, Rotated offset: {rotatedOffset}");
+    Debug.Log($"Final parent position: {position}");
+    Debug.Log($"Rotation: {ParentTrack.transform.eulerAngles.z:F1}° → {newRotation:F1}°");
 
-            // Apply the rotation
-            rotation = Quaternion.Euler(0, 0, desiredAngle);
-
-            // Calculate position considering the local offset
-            float angleRad = desiredAngle * Mathf.Deg2Rad;
-            float cos = Mathf.Cos(angleRad);
-            float sin = Mathf.Sin(angleRad);
-            Vector2 rotatedOffset = new Vector2(
-                localOffset.x * cos - localOffset.y * sin,
-                localOffset.x * sin + localOffset.y * cos
-            );
-
-            position = new Vector3(targetPos.x - rotatedOffset.x, targetPos.y - rotatedOffset.y, ParentTrack.transform.position.z);
-
-            return true;
-        }
+    return true;
+}
 
         private void OnDrawGizmos()
         {
@@ -271,6 +327,39 @@ namespace OffTheRails.Tracks
             // Draw enhanced gizmos when selected
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(transform.position, gizmoSize * 1.5f);
+        }
+
+        public ConnectionPoint FindNearestConnectionForSnapping(float searchRadius = 3.0f)
+        {
+            if (TrackManager.Instance == null)
+                return null;
+
+            ConnectionPoint nearest = null;
+            float nearestDistance = float.MaxValue;
+
+            foreach (var track in TrackManager.Instance.GetAllTracks())
+            {
+                if (track == ParentTrack)
+                    continue;
+
+                foreach (var point in track.ConnectionPoints)
+                {
+                    // Skip same parent track
+                    if (point.ParentTrack == ParentTrack)
+                        continue;
+
+                    // Check distance only (no direction check, no "already connected" check)
+                    float distance = Vector2.Distance(WorldPosition, point.WorldPosition);
+            
+                    if (distance < searchRadius && distance < nearestDistance)
+                    {
+                        nearest = point;
+                        nearestDistance = distance;
+                    }
+                }
+            }
+
+            return nearest;
         }
 #endif
     }
