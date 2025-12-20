@@ -13,17 +13,17 @@ TagManager:
   - 
   - Water
   - UI
+  - Ground
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - Road
   - Tracks
+  - Cars
   - Trains
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
   - 
   - 
   - 
@@ -43,11 +43,17 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
+  - name: Road
+    uniqueID: 1338704525
+    locked: 0
   - name: Tracks
     uniqueID: 2788690179
     locked: 0
   - name: Trains
     uniqueID: 4069331849
+    locked: 0
+  - name: Cars
+    uniqueID: 3611262181
     locked: 0
   m_RenderingLayers:
   - Default
