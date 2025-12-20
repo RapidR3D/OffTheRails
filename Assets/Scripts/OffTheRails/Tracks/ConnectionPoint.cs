@@ -118,14 +118,14 @@ namespace OffTheRails.Tracks
             float distance = Vector2.Distance(WorldPosition, other.WorldPosition);
             if (distance > snapRadius)
             {
-                Debug.Log($"CanConnectTo FAIL: Distance {distance:F3} > {snapRadius}");
+               // Debug.Log($"CanConnectTo FAIL: Distance {distance:F3} > {snapRadius}");
                 return false;
             }
             
             // skip direction check if requested (after alignment calculation)
             if (skipDirectionCheck)
             {
-                Debug.Log($"CanConnectTo SUCCESS: Direction check skipped, distance OK ({distance:F3})");
+                //Debug.Log($"CanConnectTo SUCCESS: Direction check skipped, distance OK ({distance:F3})");
                 return true;
             }
                 
@@ -137,9 +137,9 @@ namespace OffTheRails.Tracks
             
             bool directionsOK = dot <= -directionTolerance;
             
-            Debug.Log($"CanConnectTo: Distance={distance:F3}, Dot={dot:F3}, Threshold={-directionTolerance:F3}, Result={directionsOK}");
-            Debug.Log($"My WorldPos: {WorldPosition}, Other WorldPos: {other.WorldPosition}");
-            Debug.Log($"My transform.position: {transform.position}, Other transform.position: {other.transform.position}");
+           // Debug.Log($"CanConnectTo: Distance={distance:F3}, Dot={dot:F3}, Threshold={-directionTolerance:F3}, Result={directionsOK}");
+           // Debug.Log($"My WorldPos: {WorldPosition}, Other WorldPos: {other.WorldPosition}");
+           // Debug.Log($"My transform.position: {transform.position}, Other transform.position: {other.transform.position}");
             return directionsOK;
         }
 
@@ -154,13 +154,13 @@ namespace OffTheRails.Tracks
     
             if (other == null || other == this)
             {
-                Debug.LogWarning($"Cannot connect: invalid target");
+               // Debug.LogWarning($"Cannot connect: invalid target");
                 return;
             }
 
             if (IsConnected || other.IsConnected)
             {
-                Debug.LogWarning($"Cannot connect: already connected");
+               // Debug.LogWarning($"Cannot connect: already connected");
                 return;
             }
             
@@ -168,14 +168,14 @@ namespace OffTheRails.Tracks
             float distance = Vector2.Distance(WorldPosition, other.WorldPosition);
             if (distance > 0.5f)
             {
-                Debug.LogWarning($"Cannot connect {gameObject.name} to {other.gameObject.name}: too far apart ({distance:F3} units)");
+               // Debug.LogWarning($"Cannot connect {gameObject.name} to {other.gameObject.name}: too far apart ({distance:F3} units)");
                 return;
             }
 
             ConnectedTo = other;
             other.ConnectedTo = this;
 
-            Debug.Log($"✓ Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
+           // Debug.Log($"✓ Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
         }
 
         /// <summary>
@@ -189,7 +189,7 @@ namespace OffTheRails.Tracks
                 ConnectedTo = null;
                 other.ConnectedTo = null;
 
-                Debug.Log($"Disconnected {ParentTrack.gameObject.name} from {other.ParentTrack.gameObject.name}");
+               // Debug.Log($"Disconnected {ParentTrack.gameObject.name} from {other.ParentTrack.gameObject.name}");
             }
         }
 
@@ -202,7 +202,7 @@ namespace OffTheRails.Tracks
             var manager = TrackManager.GetInstance();
             if (manager == null)
             {
-                Debug.LogError("No TrackManager instance found!");
+               // Debug.LogError("No TrackManager instance found!");
                 return null;
             }
 
@@ -236,11 +236,11 @@ namespace OffTheRails.Tracks
             var manager = TrackManager.GetInstance();
             if (manager == null)
             {
-                Debug.LogError("[Editor Search] TrackManager.GetInstance() returned NULL!");
+               // Debug.LogError("[Editor Search] TrackManager.GetInstance() returned NULL!");
                 return null;
             }
             
-            Debug.Log("[Editor Search] TrackManager found");
+            //Debug.Log("[Editor Search] TrackManager found");
             
             ConnectionPoint nearest = null;
             float nearestDistance = float.MaxValue;
@@ -251,11 +251,11 @@ namespace OffTheRails.Tracks
                 trackCount++;
                 if (track == ParentTrack)
                 {
-                    Debug.Log($"[Editor Search] Skipping {track.name} - same parent");
+                    //Debug.Log($"[Editor Search] Skipping {track.name} - same parent");
                     continue;
                 }
 
-                Debug.Log($"[Editor Search] Checking track: {track.name}");
+                //Debug.Log($"[Editor Search] Checking track: {track.name}");
 
                 foreach (var point in track.ConnectionPoints)
                 {
@@ -266,16 +266,16 @@ namespace OffTheRails.Tracks
                     
                     if (point.IsConnected)
                     {
-                        Debug.Log($"[Editor Search] {point.name} already connected, skipping");
+                        //Debug.Log($"[Editor Search] {point.name} already connected, skipping");
                         continue;
                     }
 
                     float distance = Vector2.Distance(WorldPosition, point.WorldPosition);
-                    Debug.Log($"[Editor Search] {point.name} distance={distance:F3}");
+                   // Debug.Log($"[Editor Search] {point.name} distance={distance:F3}");
     
                     if (distance < searchRadius && distance < nearestDistance)
                     {
-                        Debug.Log($"[Editor Search] ✓ New nearest: {point.name}");
+                        //Debug.Log($"[Editor Search] ✓ New nearest: {point.name}");
                         nearest = point;
                         nearestDistance = distance;
                     }
@@ -284,11 +284,11 @@ namespace OffTheRails.Tracks
             // THIS IS THE CRITICAL PART - ADD THIS!
             if (nearest != null)
             {
-                Debug.Log($"[Editor Search] RETURNING: {nearest.name} at {nearestDistance:F3}");
+               // Debug.Log($"[Editor Search] RETURNING: {nearest.name} at {nearestDistance:F3}");
             }
             else
             {
-                Debug.LogWarning($"[Editor Search] RETURNING: NULL (nothing within {searchRadius})");
+               // Debug.LogWarning($"[Editor Search] RETURNING: NULL (nothing within {searchRadius})");
             }
 
             return nearest;
@@ -308,7 +308,7 @@ namespace OffTheRails.Tracks
         
             if (target == null || target == this || ParentTrack == null)
             {
-                Debug.LogWarning($"CalculateAlignmentTo FAIL: target==null:{target == null}, target==this:{target == this}, ParentTrack==null:{ParentTrack == null}");;
+               // Debug.LogWarning($"CalculateAlignmentTo FAIL: target==null:{target == null}, target==this:{target == this}, ParentTrack==null:{ParentTrack == null}");;
                 return false;
             }
                 

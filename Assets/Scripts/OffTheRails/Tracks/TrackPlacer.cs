@@ -7,6 +7,7 @@ namespace OffTheRails.Tracks
     /// <summary>
     /// Handles player interaction for placing track pieces.
     /// Supports drag and drop, snapping, and visual feedback.
+    /// FIXED VERSION: Improved track selection and deletion
     /// </summary>
     public class TrackPlacer : MonoBehaviour
     {
@@ -50,8 +51,11 @@ namespace OffTheRails.Tracks
         [Tooltip("Color for selected track")]
         [SerializeField] private Color selectionColor = Color.cyan;
 
-        [Tooltip("Layer mask for selecting tracks")]
-        [SerializeField] private LayerMask trackLayerMask;
+        [Tooltip("Radius for selecting tracks with mouse (in world units)")]
+        [SerializeField] private float selectionRadius = 1.0f;
+
+        [Tooltip("Layer mask for selecting tracks - leave at 'Everything' if unsure")]
+        [SerializeField] private LayerMask trackLayerMask = -1; // Everything by default
 
         [Header("Input Settings")]
         [Tooltip("Rotation step in degrees")]
@@ -66,6 +70,7 @@ namespace OffTheRails.Tracks
         private ConnectionPoint snapTarget = null;
         private Camera mainCamera;
         private TrackPiece selectedTrack;
+        private SpriteRenderer selectedTrackRenderer;
         private Color originalTrackColor;
 
         private void Start()
@@ -82,20 +87,7 @@ namespace OffTheRails.Tracks
                 Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
             }
 
-            // Ensure layer mask is set if empty
-            if (trackLayerMask.value == 0)
-            {
-                int layer = LayerMask.NameToLayer(trackLayer);
-                if (layer != -1)
-                {
-                    trackLayerMask = 1 << layer;
-                    Debug.Log($"TrackPlacer: Automatically set trackLayerMask to '{trackLayer}' layer.");
-                }
-                else
-                {
-                    Debug.LogWarning($"TrackPlacer: Layer '{trackLayer}' not found! Please set trackLayerMask manually.");
-                }
-            }
+            Debug.Log($"TrackPlacer initialized. Layer mask value: {trackLayerMask.value}");
         }
 
         private void Update()
@@ -117,7 +109,7 @@ namespace OffTheRails.Tracks
             Vector3 mousePos = mainCamera.ScreenToWorldPoint(mouseScreenPos);
             mousePos.z = trackZPosition;
 
-            // Handle rotation input
+            // Handle rotation input (Q and E keys)
             if (Keyboard.current.eKey.wasPressedThisFrame)
             {
                 currentRotation += rotationStep;
@@ -136,59 +128,47 @@ namespace OffTheRails.Tracks
                 }
             }
 
-            // Handle number keys for prefab selection
-            // Note: This is a simplified check for number keys 1-9
+            // Handle number keys for prefab selection (1-9)
             for (int i = 0; i < Mathf.Min(9, trackPrefabs.Length); i++)
             {
-                // Key.Digit1 is 49, Key.Digit9 is 57
                 if (Keyboard.current[Key.Digit1 + i].wasPressedThisFrame)
                 {
                     SelectPrefab(i);
                 }
             }
 
-            // Handle deletion
+            // Handle deletion (Delete or Backspace)
             if (Keyboard.current.deleteKey.wasPressedThisFrame || Keyboard.current.backspaceKey.wasPressedThisFrame)
             {
                 DeleteSelectedTrack();
             }
 
-            // Handle selection (Right Click)
-            if (Mouse.current.rightButton.wasPressedThisFrame)
+            // Check if mouse is over a switch (switches handle their own clicks)
+            bool isOverSwitch = IsMouseOverSwitch(mousePos);
+
+            // Handle selection (Right Click) - but not on switches
+            if (Mouse.current.rightButton.wasPressedThisFrame && !isOverSwitch)
             {
-                RaycastHit2D hit = Physics2D.Raycast(mousePos, Vector2.zero, 0.1f, trackLayerMask);
-                
-                if (hit.collider != null)
-                {
-                    TrackPiece clickedTrack = hit.collider.GetComponentInParent<TrackPiece>();
-                    if (clickedTrack != null)
-                    {
-                        SelectTrack(clickedTrack);
-                    }
-                }
-                else
-                {
-                    DeselectTrack();
-                }
+                TrySelectTrackAtPosition(mousePos);
             }
 
-            // Handle placement (Left Click)
-            if (Mouse.current.leftButton.wasPressedThisFrame && !isDragging)
+            // Handle placement (Left Click) - but not on switches
+            if (Mouse.current.leftButton.wasPressedThisFrame && !isDragging && !isOverSwitch)
             {
-                // Check if we clicked on an existing track
-                RaycastHit2D hit = Physics2D.Raycast(mousePos, Vector2.zero, 0.1f, trackLayerMask);
+                Debug.Log($"LEFT CLICK: isDragging={isDragging}, isOverSwitch={isOverSwitch}");
                 
-                if (hit.collider != null)
+                // Check if we clicked on an existing track first
+                TrackPiece clickedTrack = FindTrackAtPosition(mousePos);
+                
+                if (clickedTrack != null)
                 {
-                    TrackPiece clickedTrack = hit.collider.GetComponentInParent<TrackPiece>();
-                    if (clickedTrack != null)
-                    {
-                        SelectTrack(clickedTrack);
-                        return; // Don't start dragging if we selected a track
-                    }
+                    Debug.Log($"Clicked on existing track: {clickedTrack.name}, selecting it");
+                    SelectTrack(clickedTrack);
+                    return; // Don't start dragging if we selected a track
                 }
 
                 // If we didn't click a track, start dragging new one
+                Debug.Log($"No track clicked, starting drag for new track placement");
                 DeselectTrack();
                 StartDragging(mousePos);
             }
@@ -199,13 +179,156 @@ namespace OffTheRails.Tracks
                 UpdateDragging(mousePos);
             }
 
-            // End dragging
+            // End dragging (place the track)
             if (Mouse.current.leftButton.wasReleasedThisFrame && isDragging)
             {
                 EndDragging(mousePos);
             }
         }
 
+        /// <summary>
+        /// Check if the mouse is over a track switch
+        /// </summary>
+        private bool IsMouseOverSwitch(Vector3 worldPos)
+        {
+            Collider2D hitCollider = Physics2D.OverlapPoint(worldPos);
+            
+            //Debug.Log($"IsMouseOverSwitch check at {worldPos}: hitCollider = {(hitCollider != null ? hitCollider.gameObject.name : "null")}");
+            
+            if (hitCollider != null)
+            {
+                // Check if the hit collider or any of its parents have a TrackSwitch component
+                Transform checkTransform = hitCollider.transform;
+                while (checkTransform != null)
+                {
+                    TrackSwitch trackSwitch = checkTransform.GetComponent<TrackSwitch>();
+                    if (trackSwitch != null)
+                    {
+                        Debug.Log($"✓ Mouse IS over switch: {checkTransform.gameObject.name}");
+                        return true;
+                    }
+                    Debug.Log($"  Checking parent: {checkTransform.name} (no TrackSwitch found)");
+                    checkTransform = checkTransform.parent;
+                }
+                Debug.Log($"✗ Hit collider '{hitCollider.gameObject.name}' has no TrackSwitch in hierarchy");
+            }
+            else
+            {
+                //Debug.Log($"✗ No collider hit at position");
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Try to select a track at the given position
+        /// </summary>
+        private void TrySelectTrackAtPosition(Vector3 worldPos)
+        {
+            TrackPiece track = FindTrackAtPosition(worldPos);
+            
+            if (track != null)
+            {
+                SelectTrack(track);
+            }
+            else
+            {
+                DeselectTrack();
+            }
+        }
+
+        /// <summary>
+        /// Find a track piece at the given world position using distance-based selection
+        /// This works without colliders by checking against waypoints and track positions
+        /// </summary>
+        private TrackPiece FindTrackAtPosition(Vector3 worldPos)
+        {
+            if (TrackManager.Instance == null)
+            {
+                Debug.LogWarning("TrackManager instance not found");
+                return null;
+            }
+
+            TrackPiece closestTrack = null;
+            float closestDistance = selectionRadius;
+
+            foreach (var track in TrackManager.Instance.GetAllTracks())
+            {
+                if (track == null) continue;
+
+                // Method 1: Check distance to track's center/pivot
+                float centerDistance = Vector2.Distance(worldPos, track.transform.position);
+                if (centerDistance < closestDistance)
+                {
+                    closestDistance = centerDistance;
+                    closestTrack = track;
+                    continue;
+                }
+
+                // Method 2: Check distance to any waypoint along the track
+                Vector2[] waypoints = track.WorldWaypoints;
+                if (waypoints != null && waypoints.Length > 0)
+                {
+                    foreach (var waypoint in waypoints)
+                    {
+                        float waypointDistance = Vector2.Distance(worldPos, waypoint);
+                        if (waypointDistance < closestDistance)
+                        {
+                            closestDistance = waypointDistance;
+                            closestTrack = track;
+                        }
+                    }
+                    
+                    // Method 3: Check distance to line segments between waypoints
+                    for (int i = 0; i < waypoints.Length - 1; i++)
+                    {
+                        float segmentDistance = DistanceToLineSegment(worldPos, waypoints[i], waypoints[i + 1]);
+                        if (segmentDistance < closestDistance)
+                        {
+                            closestDistance = segmentDistance;
+                            closestTrack = track;
+                        }
+                    }
+                }
+            }
+
+            if (closestTrack != null)
+            {
+                Debug.Log($"Found track via distance check: {closestTrack.name} (distance: {closestDistance:F2})");
+            }
+            else
+            {
+                Debug.Log($"No track found within {selectionRadius} units of click position");
+            }
+
+            return closestTrack;
+        }
+
+        /// <summary>
+        /// Calculate the distance from a point to a line segment
+        /// </summary>
+        private float DistanceToLineSegment(Vector2 point, Vector2 lineStart, Vector2 lineEnd)
+        {
+            Vector2 line = lineEnd - lineStart;
+            float lineLength = line.magnitude;
+            
+            if (lineLength < 0.001f)
+                return Vector2.Distance(point, lineStart);
+            
+            line.Normalize();
+            
+            Vector2 toPoint = point - lineStart;
+            float projection = Vector2.Dot(toPoint, line);
+            
+            // Clamp to line segment
+            projection = Mathf.Clamp(projection, 0, lineLength);
+            
+            Vector2 closestPoint = lineStart + line * projection;
+            return Vector2.Distance(point, closestPoint);
+        }
+
+        /// <summary>
+        /// Select a track piece and highlight it
+        /// </summary>
         private void SelectTrack(TrackPiece track)
         {
             if (selectedTrack == track) return;
@@ -216,44 +339,70 @@ namespace OffTheRails.Tracks
             if (selectedTrack != null)
             {
                 // Highlight the selected track
-                var renderer = selectedTrack.GetComponentInChildren<SpriteRenderer>();
-                if (renderer != null)
+                selectedTrackRenderer = selectedTrack.GetComponentInChildren<SpriteRenderer>();
+                if (selectedTrackRenderer != null)
                 {
-                    originalTrackColor = renderer.color;
-                    renderer.color = selectionColor;
+                    originalTrackColor = selectedTrackRenderer.color;
+                    selectedTrackRenderer.color = selectionColor;
                 }
-                Debug.Log($"Selected track: {selectedTrack.name}");
+                Debug.Log($"✓ Selected track: {selectedTrack.name}");
             }
         }
 
+        /// <summary>
+        /// Deselect the currently selected track
+        /// </summary>
         private void DeselectTrack()
         {
-            if (selectedTrack != null)
+            if (selectedTrack != null && selectedTrackRenderer != null)
             {
                 // Restore original color
-                var renderer = selectedTrack.GetComponentInChildren<SpriteRenderer>();
-                if (renderer != null)
-                {
-                    renderer.color = originalTrackColor;
-                }
-                selectedTrack = null;
+                selectedTrackRenderer.color = originalTrackColor;
+                Debug.Log($"Deselected track: {selectedTrack.name}");
             }
+            
+            selectedTrack = null;
+            selectedTrackRenderer = null;
         }
 
+        /// <summary>
+        /// Delete the currently selected track
+        /// </summary>
         private void DeleteSelectedTrack()
         {
             if (selectedTrack != null)
             {
-                Debug.Log($"Deleting track: {selectedTrack.name}");
+                string trackName = selectedTrack.name;
+                
+                // Unregister from TrackManager first
+                if (TrackManager.Instance != null)
+                {
+                    TrackManager.Instance.UnregisterTrack(selectedTrack);
+                }
+                
+                // Destroy the game object
                 Destroy(selectedTrack.gameObject);
+                
                 selectedTrack = null;
+                selectedTrackRenderer = null;
+                
+                Debug.Log($"✓ Deleted track: {trackName}");
+                
+                // Regenerate paths after deletion
+                if (TrackManager.Instance != null)
+                {
+                    TrackManager.Instance.RegenerateAllPaths();
+                }
+            }
+            else
+            {
+                Debug.Log("No track selected to delete");
             }
         }
 
         /// <summary>
         /// Select a track prefab by index
         /// </summary>
-        /// <param name="index">Index of the prefab to select</param>
         public void SelectPrefab(int index)
         {
             if (index >= 0 && index < trackPrefabs.Length)
@@ -274,11 +423,9 @@ namespace OffTheRails.Tracks
         /// <summary>
         /// Start dragging a track piece
         /// </summary>
-        /// <param name="position">Starting position</param>
         private void StartDragging(Vector3 position)
         {
-            // Validate array bounds FIRST
-            if (trackPrefabs == null || trackPrefabs. Length == 0)
+            if (trackPrefabs == null || trackPrefabs.Length == 0)
             {
                 Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
                 return;
@@ -286,7 +433,7 @@ namespace OffTheRails.Tracks
 
             if (selectedPrefabIndex < 0 || selectedPrefabIndex >= trackPrefabs.Length)
             {
-                Debug.LogError($"TrackPlacer: Selected prefab index {selectedPrefabIndex} is out of bounds.  Array length is {trackPrefabs.Length}.");
+                Debug.LogError($"TrackPlacer: Selected prefab index {selectedPrefabIndex} is out of bounds. Array length is {trackPrefabs.Length}.");
                 return;
             }
 
@@ -296,24 +443,6 @@ namespace OffTheRails.Tracks
                 return;
             }
             
-            /*try
-            {
-                if (selectedPrefabIndex < 0 || selectedPrefabIndex >= trackPrefabs.Length)
-                {
-                    Debug.LogError($"TrackPlacer: Selected prefab index {selectedPrefabIndex} is out of bounds. Array length is {trackPrefabs.Length}.");
-                    return;
-                }
-
-                if (trackPrefabs[selectedPrefabIndex] == null)
-                    return;
-
-                isDragging = true;
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"Error in StartDragging: {e.Message}");
-                return;
-            }*/
             isDragging = true;
             dragStartPosition = position;
             currentRotation = 0f;
@@ -324,7 +453,6 @@ namespace OffTheRails.Tracks
         /// <summary>
         /// Update dragging state
         /// </summary>
-        /// <param name="position">Current mouse position</param>
         private void UpdateDragging(Vector3 position)
         {
             if (previewObject == null)
@@ -339,6 +467,7 @@ namespace OffTheRails.Tracks
                 {
                     TrackManager.Instance.RefreshTracks();
                 }
+                
                 // Check each connection point for potential snaps
                 foreach (var connectionPoint in previewTrack.ConnectionPoints)
                 {
@@ -348,18 +477,20 @@ namespace OffTheRails.Tracks
                     {
                         snapTarget = nearest;
                         
-                        // Align to snap target
+                        // Align to snap target (this will override manual rotation)
                         if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 snapPos, out Quaternion snapRot))
                         {
                             previewObject.transform.position = snapPos;
                             previewObject.transform.rotation = snapRot;
+                            // Update currentRotation to match snap rotation
+                            currentRotation = snapRot.eulerAngles.z;
                             return;
                         }
                     }
                 }
             }
 
-            // No snap target, just follow mouse
+            // No snap target, just follow mouse and maintain manual rotation
             Vector3 targetPos = position;
 
             // Snap to grid if enabled
@@ -370,12 +501,13 @@ namespace OffTheRails.Tracks
             }
 
             previewObject.transform.position = targetPos;
+            // Ensure rotation is applied when not snapping
+            previewObject.transform.rotation = Quaternion.Euler(0, 0, currentRotation);
         }
 
         /// <summary>
         /// End dragging and place the track
         /// </summary>
-        /// <param name="position">Final position</param>
         private void EndDragging(Vector3 position)
         {
             isDragging = false;
@@ -398,54 +530,68 @@ namespace OffTheRails.Tracks
         }
 
         /// <summary>
-        /// Create preview object
+        /// Check if the current preview position is valid for placement
+        /// </summary>
+        private bool IsValidPlacement()
+        {
+            // For now, always return true
+            // You can add custom validation logic here
+            return true;
+        }
+
+        /// <summary>
+        /// Create the preview object
         /// </summary>
         private void CreatePreview()
         {
-            // Add validation
-            if (trackPrefabs == null || trackPrefabs.Length == 0)
-            {
-                Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
-                return;
-            }
-
             if (selectedPrefabIndex < 0 || selectedPrefabIndex >= trackPrefabs.Length)
-            {
-                Debug.LogError($"TrackPlacer: Selected prefab index {selectedPrefabIndex} is out of bounds. Array length is {trackPrefabs.Length}.");
                 return;
-            }
-
 
             if (trackPrefabs[selectedPrefabIndex] == null)
-            {
-                Debug.LogWarning($"TrackPlacer: Track prefab at index {selectedPrefabIndex} is null!");
                 return;
-            }
-                
 
             previewObject = Instantiate(trackPrefabs[selectedPrefabIndex]);
-            previewObject.name = "TrackPreview";
+            previewObject.name = "Track Preview";
             
             previewTrack = previewObject.GetComponent<TrackPiece>();
-            
-            if (previewTrack == null)
-            {
-                Debug.LogError("Selected prefab does not have a TrackPiece component!");
-                Destroy(previewObject);
-                previewObject = null;
-                return;
-            }
 
             // Make preview semi-transparent
-            SetPreviewTransparency(0.5f);
+            foreach (var renderer in previewObject.GetComponentsInChildren<SpriteRenderer>())
+            {
+                Color color = renderer.color;
+                color.a = 0.5f;
+                renderer.color = color;
+            }
 
-            // Disable colliders in preview
+            // Disable colliders on preview
             foreach (var collider in previewObject.GetComponentsInChildren<Collider2D>())
             {
                 collider.enabled = false;
             }
         }
-        
+
+        /// <summary>
+        /// Update the preview object's visual state
+        /// </summary>
+        private void UpdatePreview()
+        {
+            if (previewObject == null || !isDragging)
+                return;
+
+            // Update preview color based on placement validity
+            bool isValid = IsValidPlacement();
+            Color previewColor = isValid ? validPlacementColor : invalidPlacementColor;
+
+            foreach (var renderer in previewObject.GetComponentsInChildren<SpriteRenderer>())
+            {
+                Color color = renderer.color;
+                color.r = previewColor.r;
+                color.g = previewColor.g;
+                color.b = previewColor.b;
+                renderer.color = color;
+            }
+        }
+
         /// <summary>
         /// Destroy the preview object
         /// </summary>
@@ -453,364 +599,155 @@ namespace OffTheRails.Tracks
         {
             if (previewObject != null)
             {
-                if (Application.isPlaying)
-                    Destroy(previewObject);
-                else
-                    DestroyImmediate(previewObject);
-            
+                Destroy(previewObject);
                 previewObject = null;
                 previewTrack = null;
             }
         }
 
         /// <summary>
-        /// Update preview visual feedback
-        /// </summary>
-        private void UpdatePreview()
-        {
-            if (previewObject == null || !isDragging)
-                return;
-
-            // Set color based on placement validity
-            Color color = IsValidPlacement() ? validPlacementColor : invalidPlacementColor;
-            SetPreviewColor(color);
-        }
-
-        /// <summary>
-        /// Set preview transparency
-        /// </summary>
-        /// <param name="alpha">Alpha value</param>
-        private void SetPreviewTransparency(float alpha)
-        {
-            if (previewObject == null)
-                return;
-
-            foreach (var renderer in previewObject.GetComponentsInChildren<SpriteRenderer>())
-            {
-                Color color = renderer.color;
-                color.a = alpha;
-                renderer.color = color;
-            }
-        }
-
-        /// <summary>
-        /// Set preview color
-        /// </summary>
-        /// <param name="color">Color to set</param>
-        private void SetPreviewColor(Color color)
-        {
-            if (previewObject == null)
-                return;
-
-            foreach (var renderer in previewObject.GetComponentsInChildren<SpriteRenderer>())
-            {
-                renderer.color = color;
-            }
-        }
-
-        /// <summary>
-        /// Check if current placement is valid
-        /// </summary>
-        /// <returns>True if placement is valid</returns>
-        private bool IsValidPlacement()
-        {
-            // For now, any placement is valid
-            // Could add checks for overlapping tracks, etc.
-            return true;
-        }
-
-        /// <summary>
         /// Place the track at the preview location
         /// </summary>
-        /// <summary>
-        /// Place the track at the preview location
-        /// </summary>
-       /// <summary>
-/// Place the track at the preview location
-/// </summary>
-/*private void PlaceTrack()
-{
-    if (selectedPrefabIndex < 0 || selectedPrefabIndex >= trackPrefabs.Length)
-        return;
-
-    if (previewObject == null || trackPrefabs[selectedPrefabIndex] == null)
-        return;
-
-    // Create the actual track piece
-    GameObject trackObject = Instantiate(trackPrefabs[selectedPrefabIndex], 
-        previewObject.transform.position, 
-        previewObject.transform.rotation);
-    
-    trackObject.name = trackPrefabs[selectedPrefabIndex].name;
-
-    // Set layer and sorting layer
-    SetLayerRecursively(trackObject, LayerMask.NameToLayer(trackLayer));
-    
-    foreach (var renderer in trackObject.GetComponentsInChildren<SpriteRenderer>())
-    {
-        renderer.sortingLayerName = trackSortingLayer;
-    }
-
-    // Get the track piece component
-    TrackPiece track = trackObject.GetComponent<TrackPiece>();
-
-    if (track != null && TrackManager.Instance != null)
-    {
-        // Refresh tracks in edit mode
-        if (!Application.isPlaying)
+        private void PlaceTrack()
         {
-            TrackManager.Instance.RefreshTracks();
-        }
-        
-        // Try to snap to the SPECIFIC snapTarget we found during drag
-        bool snapped = false;
-        
-        if (snapTarget != null)
-        {
-            // Find which of OUR connection points is closest to snapTarget
-            ConnectionPoint closestPoint = null;
-            float closestDistance = float.MaxValue;
+            if (selectedPrefabIndex < 0 || selectedPrefabIndex >= trackPrefabs.Length)
+                return;
+
+            if (previewObject == null || trackPrefabs[selectedPrefabIndex] == null)
+                return;
+
+            // Create the actual track piece
+            GameObject trackObject = Instantiate(trackPrefabs[selectedPrefabIndex], 
+                previewObject.transform.position, 
+                previewObject.transform.rotation);
             
-            foreach (var cp in track.ConnectionPoints)
-            {
-                float dist = Vector2.Distance(cp.WorldPosition, snapTarget.WorldPosition);
-                if (dist < closestDistance)
-                {
-                    closestDistance = dist;
-                    closestPoint = cp;
-                }
-            }
-            
-            if (closestPoint != null)
-            {
-                Debug.Log($"Attempting snap: {closestPoint.name} to {snapTarget.ParentTrack.name}, distance={closestDistance:F3}");
-                
-                // Calculate and apply alignment
-                if (closestPoint.CalculateAlignmentTo(snapTarget, out Vector3 snapPos, out Quaternion snapRot))
-                {
-                    track.transform.position = snapPos;
-                    track.transform.rotation = snapRot;
-                    
-                    // Re-check distance after alignment
-                    float finalDistance = Vector2.Distance(closestPoint.WorldPosition, snapTarget.WorldPosition);
-                    
-                    Debug.Log($"After alignment, distance={finalDistance:F3}");
-                    
-                    // Only connect if VERY close after alignment (within 0.1 units)
-                    if (finalDistance < 0.1f && closestPoint.CanConnectTo(snapTarget, skipDirectionCheck: true))
-                    {
-                        closestPoint.ConnectTo(snapTarget);
-                        snapped = true;
-                        Debug.Log($"✓ Placed and connected {track.name} to {snapTarget.ParentTrack.name}");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"✗ Alignment failed: final distance {finalDistance:F3} too large or can't connect");
-                    }
-                }
-            }
-        }
-        else
-        {
-            // No snapTarget - try to find nearby connections anyway
-            foreach (var connectionPoint in track.ConnectionPoints)
-            {
-                if (connectionPoint.IsConnected)
-                    continue;
+            trackObject.name = trackPrefabs[selectedPrefabIndex].name;
 
-                ConnectionPoint nearest = connectionPoint.FindNearestValidConnection();
-                
-                if (nearest != null)
+            // Set layer and sorting layer
+            SetLayerRecursively(trackObject, LayerMask.NameToLayer(trackLayer));
+            
+            foreach (var renderer in trackObject.GetComponentsInChildren<SpriteRenderer>())
+            {
+                renderer.sortingLayerName = trackSortingLayer;
+            }
+
+            // Get the track piece component
+            TrackPiece track = trackObject.GetComponent<TrackPiece>();
+
+            if (track != null && TrackManager.Instance != null)
+            {
+                // Refresh tracks in edit mode to ensure all tracks are registered
+                if (!Application.isPlaying)
                 {
-                    Debug.Log($"Found nearby connection: {nearest.ParentTrack.name}");
+                    TrackManager.Instance.RefreshTracks();
+                }
+                
+                bool snapped = false;
+                
+                // Use snapTarget if we have one from the preview
+                if (snapTarget != null)
+                {
+                    Debug.Log($"Attempting to snap to {snapTarget.ParentTrack.name}");
                     
-                    if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 snapPos, out Quaternion snapRot))
+                    // Find which of our connection points is closest to snapTarget
+                    ConnectionPoint closestPoint = null;
+                    float closestDistance = float.MaxValue;
+                    
+                    foreach (var cp in track.ConnectionPoints)
                     {
-                        track.transform.position = snapPos;
-                        track.transform.rotation = snapRot;
-                        
-                        float finalDistance = Vector2.Distance(connectionPoint.WorldPosition, nearest.WorldPosition);
-                        
-                        if (finalDistance < 0.1f && connectionPoint.CanConnectTo(nearest, skipDirectionCheck: true))
+                        float dist = Vector2.Distance(cp.WorldPosition, snapTarget.WorldPosition);
+                        if (dist < closestDistance)
                         {
-                            connectionPoint.ConnectTo(nearest);
-                            snapped = true;
-                            Debug.Log($"✓ Connected {track.name} to {nearest.ParentTrack.name}");
-                            break; // Only snap ONE connection point
+                            closestDistance = dist;
+                            closestPoint = cp;
                         }
                     }
-                }
-            }
-        }
-        
-        if (!snapped)
-        {
-            Debug.Log($"Placed {track.name} without snapping");
-        }
-    }
-
-    Debug.Log($"Placed track: {trackObject.name} at {trackObject.transform.position}");
-}*/
-
-      /// <summary>
-/// Place the track at the preview location
-/// </summary>
-private void PlaceTrack()
-{
-    if (selectedPrefabIndex < 0 || selectedPrefabIndex >= trackPrefabs.Length)
-        return;
-
-    if (previewObject == null || trackPrefabs[selectedPrefabIndex] == null)
-        return;
-
-    // Create the actual track piece
-    GameObject trackObject = Instantiate(trackPrefabs[selectedPrefabIndex], 
-        previewObject.transform.position, 
-        previewObject.transform.rotation);
-    
-    trackObject.name = trackPrefabs[selectedPrefabIndex].name;
-
-    // Set layer and sorting layer
-    SetLayerRecursively(trackObject, LayerMask.NameToLayer(trackLayer));
-    
-    foreach (var renderer in trackObject.GetComponentsInChildren<SpriteRenderer>())
-    {
-        renderer.sortingLayerName = trackSortingLayer;
-    }
-
-    // Get the track piece component
-    TrackPiece track = trackObject.GetComponent<TrackPiece>();
-
-    if (track != null && TrackManager.Instance != null)
-    {
-        // IMPORTANT:  Refresh tracks in edit mode to ensure all tracks are registered
-        if (!Application.isPlaying)
-        {
-            TrackManager.Instance.RefreshTracks();
-        }
-        
-        bool snapped = false;
-        
-        // Use snapTarget if we have one from the preview
-        if (snapTarget != null)
-        {
-            Debug.Log($"Attempting to snap to {snapTarget.ParentTrack.name}");
-            
-            // Find which of our connection points is closest to snapTarget
-            ConnectionPoint closestPoint = null;
-            float closestDistance = float.MaxValue;
-            
-            foreach (var cp in track.ConnectionPoints)
-            {
-                float dist = Vector2.Distance(cp.WorldPosition, snapTarget.WorldPosition);
-                if (dist < closestDistance)
-                {
-                    closestDistance = dist;
-                    closestPoint = cp;
-                }
-            }
-            
-            if (closestPoint != null && closestDistance < 5.0f) // Within 5 units
-            {
-                Debug.Log($"Closest point:  {closestPoint.name}, distance: {closestDistance: F3}");
-                
-                if (closestPoint.CalculateAlignmentTo(snapTarget, out Vector3 snapPos, out Quaternion snapRot))
-                {
-                    track.transform.position = snapPos;
-                    track.transform.rotation = snapRot;
                     
-                    // Check final distance after alignment
-                    float finalDist = Vector2.Distance(closestPoint.WorldPosition, snapTarget.WorldPosition);
-                    Debug.Log($"After alignment, distance: {finalDist:F4}");
-                    
-                    if (finalDist < 0.5f)
+                    if (closestPoint != null && closestDistance < 5.0f)
                     {
-                        // Close enough - connect with direction check skipped
-                        closestPoint.ConnectTo(snapTarget);
-                        snapped = true;
-                        Debug.Log($"✓ Connected {track.name} to {snapTarget.ParentTrack.name}");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"After alignment, still too far: {finalDist:F4}");
-                    }
-                }
-            }
-        }
-        
-        // If no snapTarget or snapping failed, try finding nearby connections
-        if (!snapped)
-        {
-            Debug.Log("No snapTarget, searching for nearby connections...");
-            
-            foreach (var connectionPoint in track.ConnectionPoints)
-            {
-                if (connectionPoint.IsConnected)
-                    continue;
-
-                // Find ALL nearby points (not just valid ones)
-                ConnectionPoint nearest = null;
-                float nearestDist = float.MaxValue;
-                
-                foreach (var otherTrack in TrackManager.Instance.GetAllTracks())
-                {
-                    if (otherTrack == track) continue;
-                    
-                    foreach (var otherPoint in otherTrack.ConnectionPoints)
-                    {
-                        if (otherPoint.IsConnected) continue;
-                        
-                        float dist = Vector2.Distance(connectionPoint.WorldPosition, otherPoint.WorldPosition);
-                        if (dist < 5.0f && dist < nearestDist) // Within 5 units
+                        if (closestPoint.CalculateAlignmentTo(snapTarget, out Vector3 snapPos, out Quaternion snapRot))
                         {
-                            nearest = otherPoint;
-                            nearestDist = dist;
+                            track.transform.position = snapPos;
+                            track.transform.rotation = snapRot;
+                            
+                            float finalDist = Vector2.Distance(closestPoint.WorldPosition, snapTarget.WorldPosition);
+                            
+                            if (finalDist < 0.5f)
+                            {
+                                closestPoint.ConnectTo(snapTarget);
+                                snapped = true;
+                                Debug.Log($"✓ Connected {track.name} to {snapTarget.ParentTrack.name}");
+                            }
                         }
                     }
                 }
                 
-                if (nearest != null)
+                // If no snapTarget or snapping failed, try finding nearby connections
+                if (!snapped)
                 {
-                    Debug.Log($"Found nearby connection: {nearest.ParentTrack.name}, distance: {nearestDist:F3}");
-                    
-                    if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 pos, out Quaternion rot))
+                    foreach (var connectionPoint in track.ConnectionPoints)
                     {
-                        track.transform.position = pos;
-                        track.transform.rotation = rot;
+                        if (connectionPoint.IsConnected)
+                            continue;
+
+                        ConnectionPoint nearest = null;
+                        float nearestDist = float.MaxValue;
                         
-                        float finalDist = Vector2.Distance(connectionPoint.WorldPosition, nearest.WorldPosition);
-                        
-                        if (finalDist < 0.5f)
+                        foreach (var otherTrack in TrackManager.Instance.GetAllTracks())
                         {
-                            connectionPoint.ConnectTo(nearest);
-                            snapped = true;
-                            Debug.Log($"✓ Connected to {nearest.ParentTrack.name}");
-                            break; // Only snap one connection
+                            if (otherTrack == track) continue;
+                            
+                            foreach (var otherPoint in otherTrack.ConnectionPoints)
+                            {
+                                if (otherPoint.IsConnected) continue;
+                                
+                                float dist = Vector2.Distance(connectionPoint.WorldPosition, otherPoint.WorldPosition);
+                                if (dist < 5.0f && dist < nearestDist)
+                                {
+                                    nearest = otherPoint;
+                                    nearestDist = dist;
+                                }
+                            }
+                        }
+                        
+                        if (nearest != null)
+                        {
+                            if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 pos, out Quaternion rot))
+                            {
+                                track.transform.position = pos;
+                                track.transform.rotation = rot;
+                                
+                                float finalDist = Vector2.Distance(connectionPoint.WorldPosition, nearest.WorldPosition);
+                                
+                                if (finalDist < 0.5f)
+                                {
+                                    connectionPoint.ConnectTo(nearest);
+                                    snapped = true;
+                                    Debug.Log($"✓ Connected to {nearest.ParentTrack.name}");
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
+                
+                if (!snapped)
+                {
+                    Debug.Log($"Placed {track.name} without snapping");
+                }
+                else
+                {
+                    // Regenerate paths after snapping
+                    TrackManager.Instance.RegenerateAllPaths();
+                }
             }
-        }
-        
-        if (!snapped)
-        {
-            Debug.Log($"Placed {track.name} without snapping");
-        }
-        else
-        {
-            // Regenerate paths after snapping
-            TrackManager.Instance.RegenerateAllPaths();
-        }
-    }
 
-    Debug.Log($"Placed track: {trackObject.name} at {trackObject.transform.position}");
-}
+            Debug.Log($"Placed track: {trackObject.name} at {trackObject.transform.position}");
+        }
 
         /// <summary>
         /// Set layer recursively for all child objects
         /// </summary>
-        /// <param name="obj">Object to set layer for</param>
-        /// <param name="layer">Layer to set</param>
         private void SetLayerRecursively(GameObject obj, int layer)
         {
             obj.layer = layer;
@@ -833,6 +770,17 @@ private void PlaceTrack()
                 {
                     Gizmos.DrawLine(previewObject.transform.position, snapTarget.WorldPosition);
                 }
+            }
+
+            // Draw selection radius indicator when hovering
+            if (!isDragging && mainCamera != null && Mouse.current != null)
+            {
+                Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
+                Vector3 mousePos = mainCamera.ScreenToWorldPoint(mouseScreenPos);
+                mousePos.z = trackZPosition;
+                
+                Gizmos.color = new Color(1f, 1f, 0f, 0.3f);
+                Gizmos.DrawWireSphere(mousePos, selectionRadius);
             }
         }
 

@@ -60,14 +60,14 @@ namespace OffTheRails.Tracks
         {
             if (track == null)
             {
-                Debug.LogWarning("Attempted to register null track");
+                //Debug.LogWarning("Attempted to register null track");
                 return;
             }
 
             if (!registeredTracks.Contains(track))
             {
                 registeredTracks.Add(track);
-                Debug.Log($"Registered track: {track.name}");
+               // Debug.Log($"Registered track: {track.name}");
                 
                 #if UNITY_EDITOR
                 if (!Application.isPlaying)
@@ -96,7 +96,7 @@ namespace OffTheRails.Tracks
                     }
                 }
 
-                Debug.Log($"Unregistered track: {track.name}");
+                //Debug.Log($"Unregistered track: {track.name}");
                 RegenerateAllPaths();
                 
                 #if UNITY_EDITOR
@@ -136,7 +136,7 @@ namespace OffTheRails.Tracks
                 registeredTracks.Clear();
                 var allTracks = UnityEngine.Object.FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
                 registeredTracks.AddRange(allTracks);
-                Debug.Log($"Refreshed {registeredTracks.Count} tracks in edit mode");
+               // Debug.Log($"Refreshed {registeredTracks.Count} tracks in edit mode");
                 UnityEditor.EditorUtility.SetDirty(this);
                 return;
             }
@@ -155,7 +155,7 @@ namespace OffTheRails.Tracks
                 }
             }
 
-            Debug.Log($"Refreshed tracks: {registeredTracks.Count} total");
+            //Debug.Log($"Refreshed tracks: {registeredTracks.Count} total");
         }
 
         /// <summary>
@@ -219,7 +219,7 @@ namespace OffTheRails.Tracks
                 paths.Add(path);
             }
 
-            Debug.Log($"Generated {paths.Count} path(s) with {processedTracks.Count} tracks total");
+            //Debug.Log($"Generated {paths.Count} path(s) with {processedTracks.Count} tracks total");
             
             #if UNITY_EDITOR
             if (!Application.isPlaying)

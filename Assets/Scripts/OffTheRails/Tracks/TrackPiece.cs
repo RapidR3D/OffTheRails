@@ -101,6 +101,14 @@ namespace OffTheRails.Tracks
         public List<Vector2> LocalWaypoints => new List<Vector2>(localWaypoints);
 
         /// <summary>
+        /// Force invalidation of the waypoint cache (useful when switch state changes)
+        /// </summary>
+        public void InvalidateWaypointCache()
+        {
+            cachedWorldWaypoints = null;
+        }
+
+        /// <summary>
         /// Length of the track piece
         /// </summary>
         public float Length
@@ -125,7 +133,9 @@ namespace OffTheRails.Tracks
 
             // Find all connection points
             ConnectionPoints = GetComponentsInChildren<ConnectionPoint>();
-            TrackSwitch = GetComponent<TrackSwitch>();
+            
+            // Find switch component (may be on a child GameObject)
+            TrackSwitch = GetComponentInChildren<TrackSwitch>();
 
             if (ConnectionPoints.Length == 0)
             {
@@ -180,7 +190,7 @@ namespace OffTheRails.Tracks
         public void GenerateWaypoints()
         {
             localWaypoints.Clear();
-            cachedWorldWaypoints = null; // Invalidate cache
+            cachedWorldWaypoints = null; // Invalidate cache - IMPORTANT for switch changes!
 
             if (ConnectionPoints.Length < 2)
             {
@@ -206,6 +216,8 @@ namespace OffTheRails.Tracks
                     GenerateJunctionWaypoints();
                     break;
             }
+            
+            Debug.Log($"Generated {localWaypoints.Count} waypoints for {gameObject.name} (Switch state: {(TrackSwitch != null && TrackSwitch.IsDiverging ? "DIVERGING" : "STRAIGHT")})");
         }
 
         private void GenerateStraightWaypoints(Vector2 start, Vector2 end)
@@ -222,19 +234,32 @@ namespace OffTheRails.Tracks
                 return;
             }
 
-            // Assume Point 0 is the common point (Input)
-            // Point 1 is Option A (Green/Straight)
-            // Point 2 is Option B (Yellow/Diverging)
-            // This might need adjustment based on specific prefab setup
-            
-            ConnectionPoint startPoint = ConnectionPoints[0];
-            ConnectionPoint endPoint = ConnectionPoints[1]; // Default to Green
-
-            if (TrackSwitch != null && TrackSwitch.IsDiverging)
+            // Log all connection points for debugging
+            Debug.Log($"=== Junction {gameObject.name} Connection Points ===");
+            for (int i = 0; i < ConnectionPoints.Length; i++)
             {
-                endPoint = ConnectionPoints[2]; // Switch to Yellow
+                Debug.Log($"  ConnectionPoints[{i}] = '{ConnectionPoints[i].name}' at position {ConnectionPoints[i].WorldPosition}");
             }
 
+            // Y-Track Connection Point Layout:
+            // ConnectionPoints[0] = First connection point (usually the common/input)
+            // ConnectionPoints[1] = Second connection point (straight path)
+            // ConnectionPoints[2] = Third connection point (diverging path)
+            
+            ConnectionPoint startPoint = ConnectionPoints[0]; // First connection point
+            ConnectionPoint endPoint = ConnectionPoints[1];   // Default to second (Straight)
+
+            bool usingDivergingPath = TrackSwitch != null && TrackSwitch.IsDiverging;
+            
+            Debug.Log($"Switch detection: TrackSwitch={TrackSwitch?.name ?? "null"}, IsDiverging={TrackSwitch?.IsDiverging ?? false}, usingDivergingPath={usingDivergingPath}");
+            
+            if (usingDivergingPath)
+            {
+                endPoint = ConnectionPoints[2]; // Switch to third (Diverging)
+            }
+
+            Debug.Log($"→ Generating JUNCTION path: '{startPoint.name}' → '{endPoint.name}' (Diverging={usingDivergingPath})");
+            
             GenerateBezierWaypoints(startPoint, endPoint);
         }
 
