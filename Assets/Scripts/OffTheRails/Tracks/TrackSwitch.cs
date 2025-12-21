@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using OffTheRails.Trains;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
@@ -5,8 +7,8 @@ using UnityEngine.InputSystem;
 namespace OffTheRails.Tracks
 {
     /// <summary>
-    /// Handles the visual and logical state of a track switch. 
-    /// Can be toggled by clicking on it to change between straight and diverging paths.
+    /// Handles the visual and logical state of a track switch.
+    /// When toggled, it rebuilds all paths to reflect the new switch state.
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
     public class TrackSwitch : MonoBehaviour
@@ -15,16 +17,9 @@ namespace OffTheRails.Tracks
         [SerializeField] private bool isDiverging = false;
         
         [Header("Visual Feedback")]
-        [Tooltip("Color when in straight mode")]
         [SerializeField] private Color straightColor = Color.green;
-        
-        [Tooltip("Color when in diverging mode")]
         [SerializeField] private Color divergingColor = Color.yellow;
-        
-        [Tooltip("Color when hovering over switch")]
         [SerializeField] private Color hoverColor = Color.cyan;
-        
-        [Tooltip("Should the switch show visual feedback?")]
         [SerializeField] private bool showVisualFeedback = true;
         
         [Header("Events")]
@@ -34,47 +29,24 @@ namespace OffTheRails.Tracks
         public TrackPiece ParentTrack { get; private set; }
 
         private SpriteRenderer spriteRenderer;
-        private Color originalColor;
         private bool isHovering = false;
         private Camera mainCamera;
 
         private void Awake()
         {
-            // Try both - check same GameObject first, then parent
             ParentTrack = GetComponent<TrackPiece>();
             if (ParentTrack == null)
-            {
                 ParentTrack = GetComponentInParent<TrackPiece>();
-            }
             
             if (ParentTrack == null)
-            {
-                Debug.LogError($"TrackSwitch on {gameObject.name} couldn't find TrackPiece component!");
-            }
+                Debug.LogError($"TrackSwitch on {gameObject.name} couldn't find TrackPiece!");
             
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             mainCamera = Camera.main;
-            
-            if (spriteRenderer != null)
-            {
-                originalColor = spriteRenderer.color;
-            }
-            
-            // Ensure we have a collider
-            Collider2D collider = GetComponent<Collider2D>();
-            if (collider == null)
-            {
-                collider = GetComponentInChildren<Collider2D>();
-                if (collider == null)
-                {
-                    Debug.LogWarning($"TrackSwitch on {gameObject.name} requires a Collider2D component!");
-                }
-            }
         }
 
         private void Start()
         {
-            // Set initial visual state
             UpdateVisuals();
         }
 
@@ -83,27 +55,19 @@ namespace OffTheRails.Tracks
             HandleInput();
         }
 
-        /// <summary>
-        /// Handle mouse input for clicking the switch
-        /// </summary>
         private void HandleInput()
         {
-            if (mainCamera == null || Mouse.current == null)
-                return;
+            if (mainCamera == null || Mouse.current == null) return;
 
-            // Get mouse position in world space
             Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
             Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(mouseScreenPos);
             
-            // Check if mouse is over this switch (checking both parent and children)
             Collider2D hitCollider = Physics2D.OverlapPoint(mouseWorldPos);
             bool wasHovering = isHovering;
             
-            // Check if the collider belongs to this switch's GameObject hierarchy
             isHovering = false;
             if (hitCollider != null)
             {
-                // Check if the hit collider is on this GameObject or any of its children
                 Transform checkTransform = hitCollider.transform;
                 while (checkTransform != null)
                 {
@@ -116,149 +80,155 @@ namespace OffTheRails.Tracks
                 }
             }
             
-            // Update hover visuals
             if (isHovering != wasHovering && showVisualFeedback)
-            {
                 UpdateVisuals();
-            }
 
-            // Handle click to toggle
             if (isHovering && Mouse.current.leftButton.wasPressedThisFrame)
-            {
-                Debug.Log($"Switch {gameObject.name} clicked!");
                 ToggleSwitch();
-            }
         }
 
         /// <summary>
-        /// Toggle the switch between straight and diverging
+        /// Toggle the switch between straight and diverging.
+        /// This rebuilds all paths and updates train positions.
         /// </summary>
         public void ToggleSwitch()
         {
+            Debug.Log($"═══════════════════════════════════════════════");
+            Debug.Log($"SWITCH TOGGLE: {gameObject.name}");
+            Debug.Log($"═══════════════════════════════════════════════");
+            
+            // Step 1: Store train states before rebuilding
+            Train[] allTrains = FindObjectsByType<Train>(FindObjectsSortMode.None);
+            Dictionary<Train, TrainState> trainStates = new Dictionary<Train, TrainState>();
+            
+            foreach (var train in allTrains)
+            {
+                if (!train.IsActive || train.GetCurrentPath() == null) continue;
+                
+                trainStates[train] = new TrainState
+                {
+                    WorldPosition = train.transform.position,
+                    Direction = train.GetDirection(),
+                    DistanceAlongPath = train.DistanceAlongPath,
+                    OldPathLength = train.GetCurrentPath().TotalLength
+                };
+                
+                Debug.Log($"[Train {train.name}] Stored state: pos={trainStates[train].WorldPosition}, dir={trainStates[train].Direction}, dist={trainStates[train].DistanceAlongPath:F1}");
+            }
+            
+            // Step 2: Toggle the switch state
             isDiverging = !isDiverging;
+            Debug.Log($"Switch state changed to: {(isDiverging ? "DIVERGING" : "STRAIGHT")}");
+            
+            // Step 3: Regenerate waypoints for the junction track
+            if (ParentTrack != null)
+            {
+                ParentTrack.InvalidateWaypointCache();
+                ParentTrack.GenerateWaypoints();
+            }
+            
+            // Step 4: Regenerate all paths with new switch state
+            // We use RegenerateAllPaths (not RebuildAllPaths) because the switch change
+            // may make some endpoint pairs unreachable and others reachable
+            if (TrackManager.Instance != null)
+            {
+                TrackManager.Instance.RegenerateAllPaths();
+            }
+            
+            // Step 5: Reassign trains to rebuilt paths, maintaining their position AND direction
+            foreach (var train in allTrains)
+            {
+                if (!trainStates.ContainsKey(train)) continue;
+                
+                var state = trainStates[train];
+                
+                // Find the path that the train should now be on
+                TrackPath newPath = TrackManager.Instance.GetPathNearestTo(state.WorldPosition);
+                
+                if (newPath == null || newPath.Waypoints.Count == 0)
+                {
+                    Debug.LogWarning($"[Train {train.name}] No valid path found!");
+                    continue;
+                }
+                
+                // Find closest point on the new path
+                float newDistance = newPath.GetClosestDistanceToPoint(state.WorldPosition);
+                
+                // Check if the path direction matches the train's original direction
+                Vector2 pathDirectionAtPoint = newPath.GetDirectionAtDistance(newDistance);
+                float dot = Vector2.Dot(state.Direction, pathDirectionAtPoint);
+                
+                if (dot < 0)
+                {
+                    // Path is going the wrong way - reverse it
+                    Debug.Log($"[Train {train.name}] Path direction mismatch (dot={dot:F2}), reversing path");
+                    newPath.Reverse();
+                    newDistance = newPath.GetClosestDistanceToPoint(state.WorldPosition);
+                }
+                
+                Debug.Log($"[Train {train.name}] Reassigned to path, distance: {state.DistanceAlongPath:F1} → {newDistance:F1}");
+                
+                train.SetPath(newPath, newDistance);
+            }
+            
+            // Step 6: Update visuals and fire event
             UpdateVisuals();
             OnSwitchToggled?.Invoke();
             
-            Debug.Log($"═══ SWITCH TOGGLE START ═══");
-            Debug.Log($"Switch '{gameObject.name}' toggled to: {(isDiverging ? "DIVERGING (Yellow)" : "STRAIGHT (Green)")}");
-            
-            // Use the cached ParentTrack reference
-            if (ParentTrack != null)
-            {
-                Debug.Log($"Found TrackPiece '{ParentTrack.gameObject.name}' - regenerating waypoints...");
-                
-                // Invalidate cache first, then regenerate
-                ParentTrack.InvalidateWaypointCache();
-                ParentTrack.GenerateWaypoints();
-                
-                Debug.Log($"Waypoints regenerated for '{ParentTrack.gameObject.name}'. Calling TrackManager.RegenerateAllPaths()...");
-                
-                // Notify TrackManager to regenerate all paths
-                if (TrackManager.Instance != null)
-                {
-                    TrackManager.Instance.RegenerateAllPaths();
-                    Debug.Log($"═══ SWITCH TOGGLE COMPLETE ═══");
-                }
-                else
-                {
-                    Debug.LogError("ERROR: TrackManager.Instance is null!");
-                }
-            }
-            else
-            {
-                Debug.LogError($"ERROR: ParentTrack is null on '{gameObject.name}'! Cannot regenerate waypoints.");
-            }
+            Debug.Log($"═══════════════════════════════════════════════");
+            Debug.Log($"SWITCH TOGGLE COMPLETE");
+            Debug.Log($"═══════════════════════════════════════════════");
+        }
+        
+        private struct TrainState
+        {
+            public Vector2 WorldPosition;
+            public Vector2 Direction;
+            public float DistanceAlongPath;
+            public float OldPathLength;
         }
 
-        /// <summary>
-        /// Set the switch state programmatically
-        /// </summary>
-        /// <param name="diverging">True for diverging, false for straight</param>
         public void SetState(bool diverging)
         {
             if (isDiverging != diverging)
-            {
                 ToggleSwitch();
-            }
         }
 
-        /// <summary>
-        /// Update visual representation of the switch
-        /// </summary>
         private void UpdateVisuals()
         {
-            if (!showVisualFeedback || spriteRenderer == null)
-                return;
+            if (!showVisualFeedback || spriteRenderer == null) return;
 
-            // Determine color based on state and hover
-            Color targetColor;
-            
             if (isHovering)
-            {
-                targetColor = hoverColor;
-            }
+                spriteRenderer.color = hoverColor;
             else if (isDiverging)
-            {
-                targetColor = divergingColor;
-            }
+                spriteRenderer.color = divergingColor;
             else
-            {
-                targetColor = straightColor;
-            }
-
-            spriteRenderer.color = targetColor;
+                spriteRenderer.color = straightColor;
         }
 
-        /// <summary>
-        /// Force visual update (useful when external code changes state)
-        /// </summary>
-        public void RefreshVisuals()
-        {
-            UpdateVisuals();
-        }
+        public void RefreshVisuals() => UpdateVisuals();
 
         private void OnDrawGizmos()
         {
-            // Draw a small indicator showing switch state
-            if (!Application.isPlaying)
-                return;
-
+            if (!Application.isPlaying) return;
             Gizmos.color = isDiverging ? Color.yellow : Color.green;
             Gizmos.DrawWireSphere(transform.position, 0.2f);
         }
 
         private void OnDrawGizmosSelected()
         {
-            // Show which connection points are active
-            var trackPiece = ParentTrack;
-            if (trackPiece == null)
-            {
-                trackPiece = GetComponent<TrackPiece>();
-                if (trackPiece == null)
-                {
-                    trackPiece = GetComponentInParent<TrackPiece>();
-                }
-            }
-            
-            if (trackPiece == null || trackPiece.ConnectionPoints.Length < 3)
-                return;
+            var trackPiece = ParentTrack ?? GetComponent<TrackPiece>() ?? GetComponentInParent<TrackPiece>();
+            if (trackPiece == null || trackPiece.ConnectionPoints.Length < 3) return;
 
-            // Draw lines to show active connections
-            Gizmos.color = Color.green;
-            if (trackPiece.ConnectionPoints.Length >= 2)
-            {
-                // Common point to straight path (always visible)
-                Gizmos.DrawLine(trackPiece.ConnectionPoints[0].WorldPosition, 
-                               trackPiece.ConnectionPoints[1].WorldPosition);
-            }
+            // Draw straight path
+            Gizmos.color = isDiverging ? new Color(0.5f, 0.5f, 0.5f, 0.3f) : Color.green;
+            Gizmos.DrawLine(trackPiece.ConnectionPoints[0].WorldPosition, 
+                           trackPiece.ConnectionPoints[1].WorldPosition);
 
-            if (trackPiece.ConnectionPoints.Length >= 3)
-            {
-                // Diverging path (active when isDiverging is true)
-                Gizmos.color = isDiverging ? Color.yellow : new Color(0.5f, 0.5f, 0.5f, 0.3f);
-                Gizmos.DrawLine(trackPiece.ConnectionPoints[0].WorldPosition, 
-                               trackPiece.ConnectionPoints[2].WorldPosition);
-            }
+            // Draw diverging path
+            Gizmos.color = isDiverging ? Color.yellow : new Color(0.5f, 0.5f, 0.5f, 0.3f);
+            Gizmos.DrawLine(trackPiece.ConnectionPoints[0].WorldPosition, 
+                           trackPiece.ConnectionPoints[2].WorldPosition);
         }
     }
 }

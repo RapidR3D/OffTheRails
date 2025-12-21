@@ -21,7 +21,7 @@ namespace Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Editor Tools", EditorStyles.boldLabel);
 
-            if (GUILayout.Button("Snap All Tracks"))
+            /*if (GUILayout.Button("Snap All Tracks"))
             {
                 SnapAllTracksWithUndo();
             }
@@ -31,7 +31,7 @@ namespace Editor
                 manager.RegenerateAllPaths();
                 EditorUtility.SetDirty(manager);
                 SceneView.RepaintAll();
-            }
+            }*/
             
             EditorGUILayout.Space();
             EditorGUILayout.HelpBox("Snap All Tracks works in both Edit and Play mode", MessageType.Info);

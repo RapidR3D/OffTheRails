@@ -192,7 +192,7 @@ namespace OffTheRails.Tracks
             ConnectedTo = other;
             other.ConnectedTo = this;
 
-           // Debug.Log($"✓ Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
+           Debug.Log($"✓Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
         }
 
         /// <summary>
@@ -257,7 +257,7 @@ namespace OffTheRails.Tracks
                 return null;
             }
             
-            //Debug.Log("[Editor Search] TrackManager found");
+            // Debug.Log("[Editor Search] TrackManager found");
             
             ConnectionPoint nearest = null;
             float nearestDistance = float.MaxValue;
@@ -268,11 +268,11 @@ namespace OffTheRails.Tracks
                 trackCount++;
                 if (track == ParentTrack)
                 {
-                    //Debug.Log($"[Editor Search] Skipping {track.name} - same parent");
+                    // Debug.Log($"[Editor Search] Skipping {track.name} - same parent");
                     continue;
                 }
 
-                //Debug.Log($"[Editor Search] Checking track: {track.name}");
+                // Debug.Log($"[Editor Search] Checking track: {track.name}");
 
                 foreach (var point in track.ConnectionPoints)
                 {
@@ -283,7 +283,7 @@ namespace OffTheRails.Tracks
                     
                     if (point.IsConnected)
                     {
-                        //Debug.Log($"[Editor Search] {point.name} already connected, skipping");
+                        // Debug.Log($"[Editor Search] {point.name} already connected, skipping");
                         continue;
                     }
 
@@ -292,7 +292,7 @@ namespace OffTheRails.Tracks
     
                     if (distance < searchRadius && distance < nearestDistance)
                     {
-                        //Debug.Log($"[Editor Search] ✓ New nearest: {point.name}");
+                        // Debug.Log($"[Editor Search] ✓ New nearest: {point.name}");
                         nearest = point;
                         nearestDistance = distance;
                     }

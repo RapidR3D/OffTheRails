@@ -2,9 +2,14 @@ using UnityEngine;
 using OffTheRails.Trains;
 using OffTheRails.Tracks;
 
+/// <summary>
+/// Test script that assigns a train to a path at startup.
+/// Attach to a GameObject and assign a Train reference.
+/// </summary>
 public class TestTrainMovement : MonoBehaviour
 {
     [SerializeField] private Train train;
+    [SerializeField] private bool startFromLeft = true;
     
     void Start()
     {
@@ -12,7 +17,7 @@ public class TestTrainMovement : MonoBehaviour
         
         if (train == null)
         {
-            Debug.LogError("Train is NULL!");
+            Debug.LogError("Train reference is NULL!");
             return;
         }
         
@@ -22,9 +27,11 @@ public class TestTrainMovement : MonoBehaviour
             return;
         }
         
+        // Regenerate paths based on current switch states
         TrackManager.Instance.RegenerateAllPaths();
+        
         var paths = TrackManager.Instance.GetPaths();
-        Debug.Log($"✓ Found {paths.Count} paths");
+        Debug.Log($"Found {paths.Count} paths");
         
         if (paths.Count == 0)
         {
@@ -32,95 +39,62 @@ public class TestTrainMovement : MonoBehaviour
             return;
         }
         
-        // Show ALL paths with their start/end points
+        // Log all paths
         for (int i = 0; i < paths.Count; i++)
         {
             var path = paths[i];
-            if (path == null || path.Waypoints == null || path.Waypoints.Count == 0)
-            {
-                Debug.LogWarning($"Path {i} is invalid!");
-                continue;
-            }
-            
-            Debug.Log($"━━━ PATH {i} ━━━");
-            Debug.Log($"Tracks: {path.TrackPieces.Count}");
-            Debug.Log($"Waypoints: {path.Waypoints.Count}");
-            Debug.Log($"First track: {path.TrackPieces[0].name}");
-            Debug.Log($"Last track: {path.TrackPieces[path.TrackPieces.Count - 1].name}");
-            Debug.Log($"First waypoint: {path.Waypoints[0]}");
-            Debug.Log($"Last waypoint: {path.Waypoints[path.Waypoints.Count - 1]}");
+            Debug.Log($"Path {i}: {path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints, length={path.TotalLength:F1}");
+            Debug.Log($"  Start: {path.StartTrack?.name ?? "null"} at {(path.Waypoints.Count > 0 ? path.Waypoints[0].ToString() : "no waypoints")}");
+            Debug.Log($"  End: {path.EndTrack?.name ?? "null"}");
         }
         
-        // Select the path that starts at the ACTUAL beginning
-        // (Look for a path that starts with "StraightTrack (1)" or similar)
+        // Select path and determine if we need to reverse it
         TrackPath selectedPath = null;
-        float minX = float.MaxValue;
-
-        foreach (var path in paths)
-        {
-            if (path.Waypoints.Count == 0)
-                continue;
         
-            float startX = path.Waypoints[0].x;
-    
-            if (startX < minX)
-            {
-                minX = startX;
-                selectedPath = path;
-            }
-        }
-
-        /*if (selectedPath != null)
+        if (paths.Count > 0)
         {
-            Debug.Log($"✓ Selected path starting at X={minX:F2} (leftmost position)");
-        }
-        // Option 1: Let user specify which track should be the start
-        string desiredStartTrack = "StraightTrack (9)"; // ← CHANGE THIS to your actual first track name
-        
-        foreach (var path in paths)
-        {
-            if (path.Waypoints.Count > 0 && path.TrackPieces[0].name == desiredStartTrack)
+            selectedPath = paths[0];
+            
+            if (selectedPath.Waypoints.Count > 0)
             {
-                selectedPath = path;
-                Debug.Log($"✓ Found path starting with '{desiredStartTrack}'!");
-                break;
-            }
-        }*/
-        
-        // Option 2: If no specific start found, use the longest path
-        /*if (selectedPath == null)
-        {
-            Debug.LogWarning($"No path starting with '{desiredStartTrack}' found, using longest path");
-            int maxWaypoints = 0;
-            foreach (var path in paths)
-            {
-                if (path.Waypoints.Count > maxWaypoints)
+                // Check which end of the path is more to the left (smaller X)
+                float startX = selectedPath.Waypoints[0].x;
+                float endX = selectedPath.Waypoints[selectedPath.Waypoints.Count - 1].x;
+                
+                bool pathGoesLeftToRight = startX < endX;
+                
+                if (startFromLeft && !pathGoesLeftToRight)
                 {
-                    maxWaypoints = path.Waypoints.Count;
-                    selectedPath = path;
+                    // We want left-to-right but path goes right-to-left, reverse it
+                    Debug.Log($"Reversing path to go left-to-right (was X={startX:F2} → X={endX:F2})");
+                    selectedPath.Reverse();
+                }
+                else if (!startFromLeft && pathGoesLeftToRight)
+                {
+                    // We want right-to-left but path goes left-to-right, reverse it
+                    Debug.Log($"Reversing path to go right-to-left (was X={startX:F2} → X={endX:F2})");
+                    selectedPath.Reverse();
+                }
+                else
+                {
+                    Debug.Log($"Path direction is correct: X={startX:F2} → X={endX:F2}");
                 }
             }
-        }*/
+        }
         
-        if (selectedPath == null)
+        if (selectedPath == null || selectedPath.Waypoints.Count == 0)
         {
-            Debug.LogError("❌ No valid path selected!");
+            Debug.LogError("No valid path selected!");
             return;
         }
         
-        Debug.Log($"═══ SELECTED PATH ═══");
-        Debug.Log($"Waypoints: {selectedPath.Waypoints.Count}");
-        Debug.Log($"First track: {selectedPath.TrackPieces[0].name}");
-        Debug.Log($"First waypoint: {selectedPath.Waypoints[0]}");
+        Debug.Log($"Selected path: {selectedPath.StartTrack?.name} → {selectedPath.EndTrack?.name}");
+        Debug.Log($"Path tracks: {string.Join(" → ", System.Linq.Enumerable.Select(selectedPath.TrackPieces, t => t.name))}");
         
-        Debug.Log($"BEFORE SetPath - Train position: {train.transform.position}");
-        
+        // Assign train to path at the start
         train.SetPath(selectedPath, 0f);
         
-        Debug.Log($"AFTER SetPath - Train position: {train.transform.position}");
-        Debug.Log($"Train IsActive: {train.IsActive}");
-        Debug.Log($"Train Speed: {train.Speed}");
-        
+        Debug.Log($"Train assigned to path at position {train.transform.position}");
         Debug.Log("=== TEST TRAIN MOVEMENT COMPLETE ===");
     }
 }

@@ -27,7 +27,7 @@ namespace OffTheRails.NPCs
             rb = GetComponent<Rigidbody2D>();
             if (rb == null)
             {
-                Debug.LogError("Rigidbody2D component is missing on " + gameObject.name);
+               // Debug.LogError("Rigidbody2D component is missing on " + gameObject.name);
                 enabled = false;
                 return;
             }
@@ -51,12 +51,11 @@ namespace OffTheRails.NPCs
                 {
                     if (isMovingRight && endPos <= startPos)
                     {
-                        Debug.LogWarning($"{gameObject.name}: Moving Right but EndPos ({endPos}) <= StartPos ({startPos}). Auto-fixing EndPos to StartPos + 50.");
+                        // Debug.LogWarning($"{gameObject.name}: Moving Right but EndPos ({endPos}) <= StartPos ({startPos}). Auto-fixing EndPos to StartPos + 50.");
                         endPos = startPos + 50f;
                     }
                     else if (!isMovingRight && endPos >= startPos)
-                    {
-                        Debug.LogWarning($"{gameObject.name}: Moving Left but EndPos ({endPos}) >= StartPos ({startPos}). Auto-fixing EndPos to StartPos - 50.");
+                    { // Debug.LogWarning($"{gameObject.name}: Moving Left but EndPos ({endPos}) >= StartPos ({startPos}). Auto-fixing EndPos to StartPos - 50.");
                         endPos = startPos - 50f;
                     }
                 }
@@ -64,12 +63,12 @@ namespace OffTheRails.NPCs
                 {
                     if (isMovingRight && endPos <= startPos)
                     {
-                        Debug.LogWarning($"{gameObject.name}: Moving Up but EndPos ({endPos}) <= StartPos ({startPos}). Auto-fixing EndPos to StartPos + 50.");
+                        // Debug.LogWarning($"{gameObject.name}: Moving Up but EndPos ({endPos}) <= StartPos ({startPos}). Auto-fixing EndPos to StartPos + 50.");
                         endPos = startPos + 50f;
                     }
                     else if (!isMovingRight && endPos >= startPos)
                     {
-                        Debug.LogWarning($"{gameObject.name}: Moving Down but EndPos ({endPos}) >= StartPos ({startPos}). Auto-fixing EndPos to StartPos - 50.");
+                        // Debug.LogWarning($"{gameObject.name}: Moving Down but EndPos ({endPos}) >= StartPos ({startPos}). Auto-fixing EndPos to StartPos - 50.");
                         endPos = startPos - 50f;
                     }
                 }
@@ -255,7 +254,7 @@ namespace OffTheRails.NPCs
                 var carPrefab = Resources.Load("NPC Moving Cars/Car" + randCar) as GameObject;
                 if (carPrefab == null)
                 {
-                    Debug.LogError("Could not load car prefab: NPC Moving Cars/Car" + randCar);
+                    // Debug.LogError("Could not load car prefab: NPC Moving Cars/Car" + randCar);
                     return;
                 }
                 GameObject newCar = Instantiate(carPrefab);

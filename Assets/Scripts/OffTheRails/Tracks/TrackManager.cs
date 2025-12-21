@@ -13,13 +13,15 @@ namespace OffTheRails.Tracks
         [SerializeField] private List<TrackPiece> registeredTracks = new List<TrackPiece>();
         [SerializeField] private List<TrackPath> paths = new List<TrackPath>();
 
-        // ADD THIS: Lazy getter that works in edit mode
+        /// <summary>
+        /// Event fired when paths are rebuilt (switches toggled)
+        /// </summary>
+        public event System.Action OnPathsRebuilt;
+
         public static TrackManager GetInstance()
         {
-            if (Instance != null)
-                return Instance;
+            if (Instance != null) return Instance;
             
-            // In edit mode, find it
             #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
@@ -38,366 +40,214 @@ namespace OffTheRails.Tracks
             }
             else if (Instance != this)
             {
-                Debug.LogWarning($"Multiple TrackManagers detected! Destroying duplicate on {gameObject.name}");
+                Debug.LogWarning($"Multiple TrackManagers! Destroying duplicate on {gameObject.name}");
                 Destroy(gameObject);
                 return;
             }
-
             RefreshTracks();
         }
 
         private void OnDestroy()
         {
-            if (Instance == this)
-            {
-                Instance = null;
-            }
+            if (Instance == this) Instance = null;
         }
 
-        /// <summary>
-        /// Register a track piece with the manager
-        /// </summary>
         public void RegisterTrack(TrackPiece track)
         {
-            if (track == null)
-            {
-                //Debug.LogWarning("Attempted to register null track");
-                return;
-            }
-
-            if (!registeredTracks.Contains(track))
-            {
-                registeredTracks.Add(track);
-               // Debug.Log($"Registered track: {track.name}");
-                
-                #if UNITY_EDITOR
-                if (!Application.isPlaying)
-                {
-                    UnityEditor.EditorUtility.SetDirty(this);
-                }
-                #endif
-            }
+            if (track == null || registeredTracks.Contains(track)) return;
+            registeredTracks.Add(track);
+            
+            #if UNITY_EDITOR
+            if (!Application.isPlaying) UnityEditor.EditorUtility.SetDirty(this);
+            #endif
         }
 
-        /// <summary>
-        /// Unregister a track piece from the manager
-        /// </summary>
         public void UnregisterTrack(TrackPiece track)
         {
             if (track == null) return;
-
             if (registeredTracks.Remove(track))
             {
-                // Disconnect all connection points
                 foreach (var cp in track.ConnectionPoints)
                 {
-                    if (cp.IsConnected)
-                    {
-                        cp.Disconnect();
-                    }
+                    if (cp.IsConnected) cp.Disconnect();
                 }
-
-                //Debug.Log($"Unregistered track: {track.name}");
-                //RegenerateAllPaths();
-                
                 #if UNITY_EDITOR
-                if (!Application.isPlaying)
-                {
-                    UnityEditor.EditorUtility.SetDirty(this);
-                }
+                if (!Application.isPlaying) UnityEditor.EditorUtility.SetDirty(this);
                 #endif
             }
         }
 
-        /// <summary>
-        /// Get all registered tracks - WORKS IN EDIT MODE
-        /// </summary>
         public IEnumerable<TrackPiece> GetAllTracks()
         {
             #if UNITY_EDITOR
-            // In edit mode, always search fresh since registration might not work
             if (!Application.isPlaying)
             {
                 return UnityEngine.Object.FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
             }
             #endif
-            
             return registeredTracks;
         }
 
-        /// <summary>
-        /// Refresh the list of registered tracks - WORKS IN EDIT MODE
-        /// </summary>
         public void RefreshTracks()
         {
             #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
-                // In edit mode, find all tracks in scene
                 registeredTracks.Clear();
-                var allTracks = UnityEngine.Object.FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
-                registeredTracks.AddRange(allTracks);
-               // Debug.Log($"Refreshed {registeredTracks.Count} tracks in edit mode");
+                registeredTracks.AddRange(UnityEngine.Object.FindObjectsByType<TrackPiece>(FindObjectsSortMode.None));
                 UnityEditor.EditorUtility.SetDirty(this);
                 return;
             }
             #endif
 
-            // Runtime: Clean up null references
             registeredTracks.RemoveAll(t => t == null);
-
-            // Find any tracks that aren't registered
-            var allTracks2 = FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
-            foreach (var track in allTracks2)
+            var allTracks = FindObjectsByType<TrackPiece>(FindObjectsSortMode.None);
+            foreach (var track in allTracks)
             {
                 if (!registeredTracks.Contains(track))
-                {
                     registeredTracks.Add(track);
-                }
             }
-
-            //Debug.Log($"Refreshed tracks: {registeredTracks.Count} total");
         }
 
         /// <summary>
-        /// Find all connected track pieces starting from the given track
-        /// </summary>
-        public HashSet<TrackPiece> FindConnectedTracks(TrackPiece startTrack)
-        {
-            HashSet<TrackPiece> connected = new HashSet<TrackPiece>();
-            Queue<TrackPiece> toProcess = new Queue<TrackPiece>();
-
-            toProcess.Enqueue(startTrack);
-            connected.Add(startTrack);
-
-            while (toProcess.Count > 0)
-            {
-                TrackPiece current = toProcess.Dequeue();
-
-                foreach (var cp in current.ConnectionPoints)
-                {
-                    if (cp.IsConnected)
-                    {
-                        TrackPiece neighbor = cp.ConnectedTo.ParentTrack;
-                        if (!connected.Contains(neighbor))
-                        {
-                            connected.Add(neighbor);
-                            toProcess.Enqueue(neighbor);
-                        }
-                    }
-                }
-            }
-
-            return connected;
-        }
-
-        /// <summary>
-        /// Regenerate all track paths from registered track pieces
-        /// Creates paths for all possible routes through the track network
+        /// Generate paths between all endpoint pairs.
+        /// Paths respect current switch states.
         /// </summary>
         public void RegenerateAllPaths()
         {
             Debug.Log("[TrackManager] ═══ REGENERATING ALL PATHS ═══");
-            
-            // Store old paths for train updates
-            Dictionary<string, TrackPath> oldPaths = new Dictionary<string, TrackPath>();
-            foreach (var path in paths)
-            {
-                oldPaths[path.PathID] = path;
-            }
-            
             paths.Clear();
 
-            // Find all endpoints (tracks with unconnected connection points)
-            List<TrackPiece> endpoints = new List<TrackPiece>();
-            
-            foreach (var track in registeredTracks)
+            // Find endpoints (tracks with unconnected connection points)
+            List<TrackPiece> endpoints = FindEndpoints();
+            Debug.Log($"[TrackManager] Found {endpoints.Count} endpoints");
+
+            if (endpoints.Count < 2)
             {
-                int connectedCount = 0;
-                foreach (var cp in track.ConnectionPoints)
-                {
-                    if (cp.IsConnected)
-                        connectedCount++;
-                }
-                
-                // Endpoint = has fewer connections than total connection points
-                if (connectedCount < track.ConnectionPoints.Length)
-                {
-                    endpoints.Add(track);
-                    Debug.Log($"[RegenerateAllPaths] Endpoint found: {track.name} ({connectedCount}/{track.ConnectionPoints.Length} connections)");
-                }
+                Debug.LogWarning("[TrackManager] Need at least 2 endpoints");
+                return;
             }
-            
-            Debug.Log($"[RegenerateAllPaths] Found {endpoints.Count} endpoints");
-            
-            // For each pair of endpoints, find ALL possible paths between them
+
+            // Create ONE path between each pair of endpoints
+            // The path will follow current switch states
             for (int i = 0; i < endpoints.Count; i++)
             {
                 for (int j = i + 1; j < endpoints.Count; j++)
                 {
-                    TrackPiece startPoint = endpoints[i];
-                    TrackPiece endPoint = endpoints[j];
+                    TrackPath path = new TrackPath();
+                    path.BuildFromEndpoints(endpoints[i], endpoints[j]);
                     
-                    Debug.Log($"[RegenerateAllPaths] Finding paths from {startPoint.name} to {endPoint.name}...");
-                    
-                    // Find all paths between these endpoints
-                    List<List<TrackPiece>> allRoutes = FindAllPathsBetween(startPoint, endPoint);
-                    
-                    Debug.Log($"Found {allRoutes.Count} possible routes");
-                    
-                    // Create a TrackPath for each route
-                    foreach (var route in allRoutes)
+                    if (path.TrackPieces.Count > 0 && path.Waypoints.Count > 0)
                     {
-                        TrackPath newPath = new TrackPath();
-                        newPath.BuildFromTrackList(route); 
-                        
-                        if (newPath.Waypoints.Count > 0)
-                        {
-                            paths.Add(newPath);
-                            Debug.Log($"✓ Created path with {newPath.TrackPieces.Count} tracks, {newPath.Waypoints.Count} waypoints");
-                        }
+                        paths.Add(path);
+                        Debug.Log($"✓ Created path: {endpoints[i].name} → {endpoints[j].name} ({path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints)");
                     }
                 }
             }
-            
-            Debug.Log($"[TrackManager] ═══ REGENERATION COMPLETE: {paths.Count} paths created ═══");
 
-        #if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                UnityEditor.EditorUtility.SetDirty(this);
-            }
-        #endif
+            Debug.Log($"[TrackManager] ═══ COMPLETE: {paths.Count} paths ═══");
 
-            // Notify all active trains to update their path references (Play Mode only)
-            if (Application.isPlaying)
-            {
-                UpdateTrainsWithNewPaths(oldPaths);
-            }
+            #if UNITY_EDITOR
+            if (!Application.isPlaying) UnityEditor.EditorUtility.SetDirty(this);
+            #endif
+
+            OnPathsRebuilt?.Invoke();
         }
 
         /// <summary>
-        /// Find ALL possible paths between two track pieces using DFS
-        /// This will find multiple routes if there are junctions
+        /// Rebuild all existing paths to reflect current switch states.
+        /// Called when a switch is toggled.
         /// </summary>
-        private List<List<TrackPiece>> FindAllPathsBetween(TrackPiece start, TrackPiece end)
+        public void RebuildAllPaths()
         {
-            List<List<TrackPiece>> allPaths = new List<List<TrackPiece>>();
-            List<TrackPiece> currentPath = new List<TrackPiece>();
-            HashSet<TrackPiece> visited = new HashSet<TrackPiece>();
-            
-            FindPathsRecursive(start, end, currentPath, visited, allPaths);
-            
-            return allPaths;
+            Debug.Log("[TrackManager] ═══ REBUILDING PATHS FOR SWITCH CHANGE ═══");
+
+            foreach (var path in paths)
+            {
+                path.RebuildPath();
+            }
+
+            Debug.Log($"[TrackManager] ═══ REBUILD COMPLETE ═══");
+
+            OnPathsRebuilt?.Invoke();
         }
 
         /// <summary>
-        /// Recursive DFS to find all paths
+        /// Find all endpoint track pieces (tracks with at least one unconnected connection point)
         /// </summary>
-        private void FindPathsRecursive(TrackPiece current, TrackPiece target, List<TrackPiece> currentPath, HashSet<TrackPiece> visited, List<List<TrackPiece>> allPaths, int depth = 0)
+        private List<TrackPiece> FindEndpoints()
         {
-            string indent = new string(' ', depth * 2);
-    
-            // Add current to path
-            currentPath.Add(current);
-            visited.Add(current);
-    
-            Debug.Log($"{indent}[DFS depth={depth}] At '{current.name}', path length={currentPath.Count}");
-    
-            // Check if we reached the target
-            if (current == target)
-            {
-                // Found a complete path!  Save a copy
-                Debug.Log($"{indent}✓ FOUND COMPLETE PATH with {currentPath.Count} tracks!");
-                allPaths.Add(new List<TrackPiece>(currentPath));
-            }
-            else
-            {
-                // Explore all connected tracks (respecting current switch states)
-                var connections = current.GetConnectedTracks(respectSwitchState: false);
-        
-                Debug.Log($"{indent} '{current.name}' has {connections.Count} connections");
-        
-                foreach (var next in connections)
-                {
-                    if (!visited.Contains(next))
-                    {
-                        Debug.Log($"{indent} → Exploring '{next.name}'");
-                        FindPathsRecursive(next, target, currentPath, visited, allPaths,depth + 1);
-                    }
-                    else
-                    {
-                        Debug.Log($"{indent} → Skipping '{next.name}' (already visited)");
-                    }
-                }
-        
-                if (connections.Count == 0)
-                {
-                    Debug.LogWarning($"{indent} ⚠️ DEAD END at '{current.name}'!");
-                }
-            }
-    
-            // Backtrack
-            Debug.Log($"{indent}[DFS depth={depth}] Backtracking from '{current.name}'");
-            currentPath.RemoveAt(currentPath.Count - 1);
-            visited.Remove(current);
-        }
-        
-        private void UpdateTrainsWithNewPaths(Dictionary<string, TrackPath> oldPaths)
-        {
-            // Find all active trains in the scene
-            var trains = FindObjectsOfType<Train>();
-    
-            foreach (var train in trains)
-            {
-                if (!train.IsActive)
-                    continue;
+            List<TrackPiece> endpoints = new List<TrackPiece>();
             
-                // Get the train's current path
-                var currentPath = train.GetCurrentPath(); // You'll need to add this getter
-                if (currentPath == null)
-                    continue;
-            
-                // Find the regenerated version of this path
-                TrackPath newPath = null;
-                foreach (var path in paths)
+            foreach (var track in registeredTracks)
+            {
+                bool hasUnconnected = false;
+                foreach (var cp in track.ConnectionPoints)
                 {
-                    // Match by first track piece (simple heuristic)
-                    if (path.TrackPieces.Count > 0 && 
-                        currentPath.TrackPieces.Count > 0 &&
-                        path.TrackPieces[0] == currentPath.TrackPieces[0])
+                    if (!cp.IsConnected)
                     {
-                        newPath = path;
+                        hasUnconnected = true;
                         break;
                     }
                 }
-        
-                if (newPath != null)
+                
+                if (hasUnconnected)
                 {
-                    Debug.Log($"Updating train {train.name} to use regenerated path");
-                    train.UpdatePath(newPath); 
+                    endpoints.Add(track);
                 }
             }
+            
+            return endpoints;
         }
-        /// <summary>
-        /// Get all track paths
-        /// </summary>
+
         public IReadOnlyList<TrackPath> GetPaths()
         {
             return paths.AsReadOnly();
         }
 
         /// <summary>
-        /// Find the path that contains the given track
+        /// Get the path that starts nearest to the given position.
+        /// Useful for assigning trains to paths.
         /// </summary>
+        public TrackPath GetPathNearestTo(Vector2 position)
+        {
+            TrackPath nearest = null;
+            float nearestDist = float.MaxValue;
+
+            foreach (var path in paths)
+            {
+                if (path.Waypoints.Count == 0) continue;
+                
+                // Check distance to path start
+                float dist = Vector2.Distance(position, path.Waypoints[0]);
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearest = path;
+                }
+            }
+
+            return nearest;
+        }
+
+        /// <summary>
+        /// Get a path that starts from a specific track piece
+        /// </summary>
+        public TrackPath GetPathStartingFrom(TrackPiece startTrack)
+        {
+            foreach (var path in paths)
+            {
+                if (path.StartTrack == startTrack)
+                    return path;
+            }
+            return null;
+        }
+
         public TrackPath FindPathContaining(TrackPiece track)
         {
-            return paths.FirstOrDefault(p => p.TrackPieces.Contains(track));
+            return paths.FirstOrDefault(p => p.ContainsTrack(track));
         }
-        
-        /// <summary>
-        /// EDITOR/DEBUG: Force check all tracks and connect nearby connection points
-        /// </summary>
+
         [ContextMenu("Force Connect Nearby Tracks")]
         public void ForceConnectNearbyTracks()
         {
@@ -407,37 +257,27 @@ namespace OffTheRails.Tracks
             {
                 foreach (var cp in track.ConnectionPoints)
                 {
-                    if (cp.IsConnected)
-                        continue;
+                    if (cp.IsConnected) continue;
                         
-                    // Find nearest unconnected point
                     foreach (var otherTrack in GetAllTracks())
                     {
-                        if (otherTrack == track)
-                            continue;
+                        if (otherTrack == track) continue;
                             
                         foreach (var otherCp in otherTrack.ConnectionPoints)
                         {
-                            if (otherCp.IsConnected)
-                                continue;
+                            if (otherCp.IsConnected) continue;
                                 
                             float distance = Vector2.Distance(cp.WorldPosition, otherCp.WorldPosition);
                             
-                            // If very close (within 0.5 units), connect them
                             if (distance < 0.5f)
                             {
-                                // Check if directions are roughly opposite
                                 float dot = Vector2.Dot(cp.WorldDirection, otherCp.WorldDirection);
                                 
-                                if (dot < -0.7f) // Roughly opposite
+                                if (dot < -0.7f)
                                 {
                                     cp.ConnectTo(otherCp);
                                     connectionsFound++;
-                                    Debug.Log($"✓ Force connected {track.name} to {otherTrack.name} (distance: {distance:F3}, dot: {dot:F3})");
-                                }
-                                else
-                                {
-                                    Debug.LogWarning($"✗ Close but wrong direction: {track.name} to {otherTrack.name} (dot: {dot:F3})");
+                                    Debug.Log($"✓ Connected {track.name} to {otherTrack.name}");
                                 }
                             }
                         }
@@ -445,7 +285,7 @@ namespace OffTheRails.Tracks
                 }
             }
             
-            Debug.Log($"=== Force connection complete: {connectionsFound} connections made ===");
+            Debug.Log($"=== Force connection complete: {connectionsFound} ===");
             
             if (connectionsFound > 0)
             {
