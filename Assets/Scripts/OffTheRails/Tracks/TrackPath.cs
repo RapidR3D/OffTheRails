@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using OffTheRails.Tracks;
 using UnityEngine;
+using System.Linq;
 
 namespace OffTheRails.Tracks
 {
@@ -63,20 +64,22 @@ namespace OffTheRails.Tracks
 
             Clear();
 
-            // Use breadth-first search to find all connected tracks
+            // Step 1: Use BFS to find all connected tracks
             HashSet<TrackPiece> visited = new HashSet<TrackPiece>();
             Queue<TrackPiece> toVisit = new Queue<TrackPiece>();
 
             toVisit.Enqueue(startTrack);
             visited.Add(startTrack);
 
+            List<TrackPiece> allTracks = new List<TrackPiece>();
+
             while (toVisit.Count > 0)
             {
                 TrackPiece current = toVisit.Dequeue();
-                TrackPieces.Add(current);
+                allTracks.Add(current);
 
-                // Visit connected tracks
-                foreach (var connected in current.GetConnectedTracks())
+                // Visit connected tracks (ignore switch state for path building)
+                foreach (var connected in current.GetConnectedTracks(respectSwitchState: false))
                 {
                     if (!visited.Contains(connected))
                     {
@@ -86,31 +89,113 @@ namespace OffTheRails.Tracks
                 }
             }
 
-            // Generate waypoints from the track pieces
-            GenerateWaypoints();
+            Debug.Log($"[BuildFromTrack] Found {allTracks.Count} connected tracks via BFS");
+
+            // Step 2: Find ACTUAL endpoints (tracks with unconnected connection points)
+            TrackPiece startPoint = null;
+            int minConnections = int.MaxValue;
             
+            foreach (var track in allTracks)
+            {
+                // Count ACTUAL physical connections (not respecting switch state)
+                int connectedCount = 0;
+                
+                foreach (var cp in track.ConnectionPoints)
+                {
+                    if (cp.IsConnected)
+                    {
+                        connectedCount++;
+                    }
+                }
+                
+                Debug.Log($"[BuildFromTrack] Track '{track.name}' has {connectedCount} connected points (out of {track.ConnectionPoints.Length} total)");
+                
+                // Prefer tracks with fewer connections (true endpoints)
+                // A straight track with 1 connection = endpoint
+                // A junction with 2 connections = also a valid start
+                if (connectedCount < minConnections && connectedCount < track.ConnectionPoints.Length)
+                {
+                    minConnections = connectedCount;
+                    startPoint = track;
+                }
+            }
+
+            // If no endpoint found, use the original start
+            if (startPoint == null)
+            {
+                startPoint = startTrack;
+                Debug.LogWarning($"[BuildFromTrack] No clear endpoint found, using original start: {startTrack.name}");
+            }
+            else
+            {
+                Debug.Log($"[BuildFromTrack] Selected endpoint: {startPoint.name} with {minConnections} connections");
+            }
+
+            // Step 3: Traverse from the endpoint to build ordered list
+            TrackPieces.Clear();
+            visited.Clear();
+            
+            TrackPiece current2 = startPoint;
+            TrackPieces.Add(current2);
+            visited.Add(current2);
+
+            Debug.Log($"[BuildFromTrack] Starting traversal from {startPoint.name}");
+            
+            int traversalStep = 0;
+            while (true)
+            {
+                var possibleNext = current2.GetConnectedTracks(respectSwitchState: false);
+                TrackPiece next = null;
+    
+                // Filter out already visited tracks
+                List<TrackPiece> candidates = new List<TrackPiece>();
+                foreach (var candidate in possibleNext)
+                {
+                    if (!visited.Contains(candidate))
+                    {
+                        candidates.Add(candidate);
+                    }
+                }
+    
+                if (candidates.Count == 0)
+                {
+                    Debug.Log($"[BuildFromTrack] Step {traversalStep}: At {current2.name} - DEAD END");
+                    break;
+                }
+                else if (candidates.Count == 1)
+                {
+                    next = candidates[0];
+                    Debug.Log($"[BuildFromTrack] Step {traversalStep}: {current2.name} → {next.name}");
+                }
+                else
+                {
+                    // Multiple paths - take the first one
+                    next = candidates[0];
+                    Debug.Log($"[BuildFromTrack] Step {traversalStep}: {current2.name} → {next.name} (chose from {candidates.Count} options)");
+                }
+    
+                if (next == null)
+                    break;
+        
+                TrackPieces.Add(next);
+                visited.Add(next);
+                current2 = next;
+                traversalStep++;
+            }
+            Debug.Log($"[TrackPath] ✓ Ordered {TrackPieces.Count} tracks (started from {startPoint.name})");
+        
+            // Generate waypoints from the ordered track pieces
+            GenerateWaypoints();   
+        
             // Calculate total length
-            CalculateTotalLength();
-
+            CalculateTotalLength();  
+        
             // Check if this is a loop
-            CheckIfLoop();
-
-            Debug.Log($"Built path {PathID} with {TrackPieces.Count} tracks and {Waypoints.Count} waypoints");
+            CheckIfLoop(); 
+            //Debug.Log($"[TrackPath] ✓ Ordered {TrackPieces.Count} tracks (started from {startPoint.name})");
+            Debug.Log($"[TrackPath] Track order: {string.Join(" → ", System.Linq.Enumerable.Select(TrackPieces, t => t.name))}");
         }
-
-        /// <summary>
-        /// Add a track piece to this path
-        /// </summary>
-        /// <param name="track">The track piece to add</param>
-        public void AddTrack(TrackPiece track)
-        {
-            if (track == null || TrackPieces.Contains(track))
-                return;
-
-            TrackPieces.Add(track);
-            RegenerateWaypoints();
-        }
-
+        
         /// <summary>
         /// Remove a track piece from this path
         /// </summary>
@@ -121,7 +206,8 @@ namespace OffTheRails.Tracks
                 return;
 
             TrackPieces.Remove(track);
-            RegenerateWaypoints();
+            GenerateWaypoints();
+            CalculateTotalLength();
         }
 
         /// <summary>
@@ -136,17 +222,7 @@ namespace OffTheRails.Tracks
         }
 
         /// <summary>
-        /// Regenerate waypoints and recalculate properties
-        /// </summary>
-        public void RegenerateWaypoints()
-        {
-            GenerateWaypoints();
-            CalculateTotalLength();
-            CheckIfLoop();
-        }
-
-        /// <summary>
-        /// Generate waypoints from track pieces
+        /// Generate waypoints from track pieces (assumes TrackPieces is already ordered)
         /// </summary>
         private void GenerateWaypoints()
         {
@@ -155,112 +231,69 @@ namespace OffTheRails.Tracks
             if (TrackPieces.Count == 0)
                 return;
 
-            // 1. Build adjacency map and calculate in-degrees restricted to this path's tracks
-            Dictionary<TrackPiece, List<TrackPiece>> adjacency = new Dictionary<TrackPiece, List<TrackPiece>>();
-            Dictionary<TrackPiece, int> inDegree = new Dictionary<TrackPiece, int>();
-            HashSet<TrackPiece> trackSet = new HashSet<TrackPiece>(TrackPieces);
+            Debug.Log($"[GenerateWaypoints] Processing {TrackPieces.Count} ordered tracks");
 
-            foreach (var track in TrackPieces)
+            // Combine waypoints from ordered tracks
+            for (int i = 0; i < TrackPieces.Count; i++)
             {
-                adjacency[track] = new List<TrackPiece>();
-                if (!inDegree.ContainsKey(track)) inDegree[track] = 0;
-
-                foreach (var connected in track.GetConnectedTracks())
-                {
-                    if (trackSet.Contains(connected))
-                    {
-                        adjacency[track].Add(connected);
-                        
-                        if (!inDegree.ContainsKey(connected)) inDegree[connected] = 0;
-                        inDegree[connected]++;
-                    }
-                }
-            }
-
-            // 2. Find start node (min in-degree)
-            TrackPiece startTrack = TrackPieces[0];
-            int minInDegree = int.MaxValue;
-
-            foreach (var kvp in inDegree)
-            {
-                if (kvp.Value < minInDegree)
-                {
-                    minInDegree = kvp.Value;
-                    startTrack = kvp.Key;
-                }
-            }
-
-            // 3. Traverse to build ordered list
-            List<TrackPiece> orderedTracks = new List<TrackPiece>();
-            HashSet<TrackPiece> processed = new HashSet<TrackPiece>();
-            
-            TrackPiece current = startTrack;
-            
-            while (current != null)
-            {
-                orderedTracks.Add(current);
-                processed.Add(current);
-
-                // Find next
-                TrackPiece next = null;
-                if (adjacency.ContainsKey(current))
-                {
-                    foreach (var neighbor in adjacency[current])
-                    {
-                        if (!processed.Contains(neighbor))
-                        {
-                            next = neighbor;
-                            break;
-                        }
-                    }
-                }
-                
-                current = next;
-            }
-
-            // 4. Combine waypoints from ordered tracks
-            for (int i = 0; i < orderedTracks.Count; i++)
-            {
-                Vector2[] trackWaypoints = orderedTracks[i].WorldWaypoints;
+                Vector2[] trackWaypoints = TrackPieces[i].WorldWaypoints;
                 
                 if (trackWaypoints.Length == 0)
+                {
+                    Debug.LogWarning($"[GenerateWaypoints] Track {TrackPieces[i].name} has no waypoints! Skipping...");
                     continue;
+                }
 
                 // For the first track, add all waypoints
-                if (i == 0)
+                if (i == 0 || Waypoints.Count == 0)
                 {
                     Waypoints.AddRange(trackWaypoints);
+                    Debug.Log($"[GenerateWaypoints] Track {i} ({TrackPieces[i].name}): Added {trackWaypoints.Length} waypoints (Total: {Waypoints.Count})");
                 }
                 else
                 {
                     // For subsequent tracks, check if we should reverse waypoints
-                    // and skip the first waypoint if it's close to the last one (connection point)
                     Vector2 lastWaypoint = Waypoints[Waypoints.Count - 1];
                     Vector2 firstOfNew = trackWaypoints[0];
                     Vector2 lastOfNew = trackWaypoints[trackWaypoints.Length - 1];
 
-                    // Check which end of the new track connects to the last waypoint
                     float distToFirst = Vector2.Distance(lastWaypoint, firstOfNew);
                     float distToLast = Vector2.Distance(lastWaypoint, lastOfNew);
 
+                    Debug.Log($"[GenerateWaypoints] Track {i} ({TrackPieces[i].name}): distToFirst={distToFirst:F2}, distToLast={distToLast:F2}");
+
+                    // Tolerance for "close enough" connections (increased for junctions)
+                    float tolerance = 1.0f;
+                    
                     if (distToLast < distToFirst)
                     {
                         // Reverse the waypoints
-                        for (int j = trackWaypoints.Length - 2; j >= 0; j--)
+                        int startIndex = (distToLast < tolerance) ? trackWaypoints.Length - 2 : trackWaypoints.Length - 1;
+                        Debug.Log($" → Reversing waypoints (adding from index {startIndex} down to 0)");
+                        
+                        for (int j = startIndex; j >= 0; j--)
                         {
                             Waypoints.Add(trackWaypoints[j]);
                         }
                     }
                     else
                     {
-                        // Add waypoints in order, skipping the first if it's a duplicate
-                        for (int j = (distToFirst < 0.1f ? 1 : 0); j < trackWaypoints.Length; j++)
+                        // Add waypoints in order
+                        bool skipFirst = distToFirst < tolerance;
+                        int startIndex = skipFirst ? 1 : 0;
+                        Debug.Log($" → Adding in order (starting from index {startIndex})");
+                        
+                        for (int j = startIndex; j < trackWaypoints.Length; j++)
                         {
                             Waypoints.Add(trackWaypoints[j]);
                         }
                     }
+                    
+                    Debug.Log($" → Total waypoints now: {Waypoints.Count}");
                 }
             }
+            
+            Debug.Log($"[TrackPath] ✓ Generated {Waypoints.Count} total waypoints from {TrackPieces.Count} tracks");
         }
 
         /// <summary>
@@ -392,6 +425,21 @@ namespace OffTheRails.Tracks
         public bool ContainsTrack(TrackPiece track)
         {
             return TrackPieces.Contains(track);
+        }
+        
+        /// <summary>
+        /// Build a path from a list of ordered track pieces
+        /// </summary>
+        public void BuildFromTrackList(List<TrackPiece> trackPieces)
+        {
+            Clear();
+            TrackPieces.AddRange(trackPieces);
+    
+            GenerateWaypoints();
+            CalculateTotalLength();
+            CheckIfLoop();
+    
+            Debug.Log($"[TrackPath] Built path {PathID} with {TrackPieces.Count} tracks and {Waypoints.Count} waypoints");
         }
     }
 }

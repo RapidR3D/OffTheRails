@@ -29,14 +29,18 @@ namespace OffTheRails.Tracks
         [Tooltip("Size of the gizmo sphere")]
         [SerializeField] private float gizmoSize = 0.2f;
 
+        
+        [SerializeField] private ConnectionPoint connectedTo;
         /// <summary>
         /// The connection point this is currently connected to
         /// </summary>
-        public ConnectionPoint ConnectedTo { get; private set; }
-
-        /// <summary>
-        /// The track piece this connection point belongs to
-        /// </summary>
+        public ConnectionPoint ConnectedTo
+        {
+            get => connectedTo;
+            private set => connectedTo = value;
+            
+        }
+        
         /// <summary>
         /// The track piece this connection point belongs to
         /// </summary>
@@ -63,7 +67,20 @@ namespace OffTheRails.Tracks
         /// World space position of this connection point
         /// </summary>
         public Vector2 WorldPosition => transform.position;
-
+        
+        /// <summary>
+        /// Get the local position of this connection point (relative to parent track)
+        /// </summary>
+        public Vector2 LocalPosition
+        {
+            get
+            {
+                if (ParentTrack == null)
+                    return Vector2.zero;
+            
+                return transform.localPosition;
+            }
+        }
         /// <summary>
         /// World space direction of this connection point
         /// </summary>

@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
 
-namespace OffTheRails.Tracks  
+namespace OffTheRails.Tracks
 {
     /// <summary>
     /// Handles the visual and logical state of a track switch. 
@@ -40,7 +40,18 @@ namespace OffTheRails.Tracks
 
         private void Awake()
         {
+            // Try both - check same GameObject first, then parent
             ParentTrack = GetComponent<TrackPiece>();
+            if (ParentTrack == null)
+            {
+                ParentTrack = GetComponentInParent<TrackPiece>();
+            }
+            
+            if (ParentTrack == null)
+            {
+                Debug.LogError($"TrackSwitch on {gameObject.name} couldn't find TrackPiece component!");
+            }
+            
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             mainCamera = Camera.main;
             
@@ -53,7 +64,11 @@ namespace OffTheRails.Tracks
             Collider2D collider = GetComponent<Collider2D>();
             if (collider == null)
             {
-                Debug.LogWarning($"TrackSwitch on {gameObject.name} requires a Collider2D component!");
+                collider = GetComponentInChildren<Collider2D>();
+                if (collider == null)
+                {
+                    Debug.LogWarning($"TrackSwitch on {gameObject.name} requires a Collider2D component!");
+                }
             }
         }
 
@@ -127,32 +142,31 @@ namespace OffTheRails.Tracks
             Debug.Log($"═══ SWITCH TOGGLE START ═══");
             Debug.Log($"Switch '{gameObject.name}' toggled to: {(isDiverging ? "DIVERGING (Yellow)" : "STRAIGHT (Green)")}");
             
-            // Notify TrackManager to regenerate paths
-            if (TrackManager.Instance != null)
+            // Use the cached ParentTrack reference
+            if (ParentTrack != null)
             {
-                // Force the track piece to regenerate its waypoints
-                // Use GetComponentInParent since the switch is a child of the track piece
-                var trackPiece = GetComponentInParent<TrackPiece>();
-                if (trackPiece != null)
+                Debug.Log($"Found TrackPiece '{ParentTrack.gameObject.name}' - regenerating waypoints...");
+                
+                // Invalidate cache first, then regenerate
+                ParentTrack.InvalidateWaypointCache();
+                ParentTrack.GenerateWaypoints();
+                
+                Debug.Log($"Waypoints regenerated for '{ParentTrack.gameObject.name}'. Calling TrackManager.RegenerateAllPaths()...");
+                
+                // Notify TrackManager to regenerate all paths
+                if (TrackManager.Instance != null)
                 {
-                    Debug.Log($"Found TrackPiece on '{trackPiece.gameObject.name}' - regenerating waypoints...");
-                    
-                    // Invalidate cache first, then regenerate
-                    trackPiece.InvalidateWaypointCache();
-                    trackPiece.GenerateWaypoints();
-                    
-                    Debug.Log($"Waypoints regenerated. Calling TrackManager.RegenerateAllPaths()...");
                     TrackManager.Instance.RegenerateAllPaths();
                     Debug.Log($"═══ SWITCH TOGGLE COMPLETE ═══");
                 }
                 else
                 {
-                    //Debug.LogError($"ERROR: No TrackPiece component found on '{gameObject.name}' or its parents!");
+                    Debug.LogError("ERROR: TrackManager.Instance is null!");
                 }
             }
             else
             {
-               // Debug.LogError("ERROR: TrackManager.Instance is null!");
+                Debug.LogError($"ERROR: ParentTrack is null on '{gameObject.name}'! Cannot regenerate waypoints.");
             }
         }
 
@@ -216,7 +230,16 @@ namespace OffTheRails.Tracks
         private void OnDrawGizmosSelected()
         {
             // Show which connection points are active
-            var trackPiece = GetComponent<TrackPiece>();
+            var trackPiece = ParentTrack;
+            if (trackPiece == null)
+            {
+                trackPiece = GetComponent<TrackPiece>();
+                if (trackPiece == null)
+                {
+                    trackPiece = GetComponentInParent<TrackPiece>();
+                }
+            }
+            
             if (trackPiece == null || trackPiece.ConnectionPoints.Length < 3)
                 return;
 
@@ -224,7 +247,7 @@ namespace OffTheRails.Tracks
             Gizmos.color = Color.green;
             if (trackPiece.ConnectionPoints.Length >= 2)
             {
-                // Common point to straight path (always active)
+                // Common point to straight path (always visible)
                 Gizmos.DrawLine(trackPiece.ConnectionPoints[0].WorldPosition, 
                                trackPiece.ConnectionPoints[1].WorldPosition);
             }

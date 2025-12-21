@@ -193,7 +193,7 @@ namespace OffTheRails.Tracks
         {
             Collider2D hitCollider = Physics2D.OverlapPoint(worldPos);
             
-            //Debug.Log($"IsMouseOverSwitch check at {worldPos}: hitCollider = {(hitCollider != null ? hitCollider.gameObject.name : "null")}");
+            // Debug.Log($"IsMouseOverSwitch check at {worldPos}: hitCollider = {(hitCollider != null ? hitCollider.gameObject.name : "null")}");
             
             if (hitCollider != null)
             {
@@ -204,17 +204,17 @@ namespace OffTheRails.Tracks
                     TrackSwitch trackSwitch = checkTransform.GetComponent<TrackSwitch>();
                     if (trackSwitch != null)
                     {
-                        Debug.Log($"✓ Mouse IS over switch: {checkTransform.gameObject.name}");
+                        //Debug.Log($"✓ Mouse IS over switch: {checkTransform.gameObject.name}");
                         return true;
                     }
                     Debug.Log($"  Checking parent: {checkTransform.name} (no TrackSwitch found)");
                     checkTransform = checkTransform.parent;
                 }
-                Debug.Log($"✗ Hit collider '{hitCollider.gameObject.name}' has no TrackSwitch in hierarchy");
+                // Debug.Log($"✗ Hit collider '{hitCollider.gameObject.name}' has no TrackSwitch in hierarchy");
             }
             else
             {
-                //Debug.Log($"✗ No collider hit at position");
+                // Debug.Log($"✗ No collider hit at position");
             }
             return false;
         }
