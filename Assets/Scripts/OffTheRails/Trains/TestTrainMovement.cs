@@ -1,25 +1,29 @@
 using UnityEngine;
 using OffTheRails.Trains;
 using OffTheRails.Tracks;
+using System.Collections.Generic;
 
 /// <summary>
-/// Test script that assigns a train to a path at startup.
-/// Attach to a GameObject and assign a Train reference.
+/// Test script that assigns trains to paths at startup.
+/// Can set up two trains on a collision course to test switch diversion.
 /// </summary>
 public class TestTrainMovement : MonoBehaviour
 {
-    [SerializeField] private Train train;
-    [SerializeField] private bool startFromLeft = true;
+    [Header("Train 1 - Left to Right")]
+    [SerializeField] private Train train1;
+    [SerializeField] private bool enableTrain1 = true;
+    
+    [Header("Train 2 - Right to Left (Collision Course)")]
+    [SerializeField] private Train train2;
+    [SerializeField] private bool enableTrain2 = true;
+    
+    // Store paths separately so they don't interfere with each other
+    private TrackPath train1Path;
+    private TrackPath train2Path;
     
     void Start()
     {
         Debug.Log("=== TEST TRAIN MOVEMENT START ===");
-        
-        if (train == null)
-        {
-            Debug.LogError("Train reference is NULL!");
-            return;
-        }
         
         if (TrackManager.Instance == null)
         {
@@ -44,57 +48,61 @@ public class TestTrainMovement : MonoBehaviour
         {
             var path = paths[i];
             Debug.Log($"Path {i}: {path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints, length={path.TotalLength:F1}");
-            Debug.Log($"  Start: {path.StartTrack?.name ?? "null"} at {(path.Waypoints.Count > 0 ? path.Waypoints[0].ToString() : "no waypoints")}");
-            Debug.Log($"  End: {path.EndTrack?.name ?? "null"}");
         }
         
-        // Select path and determine if we need to reverse it
-        TrackPath selectedPath = null;
+        // Get the main path's endpoints
+        TrackPiece startTrack = paths[0].StartTrack;
+        TrackPiece endTrack = paths[0].EndTrack;
         
-        if (paths.Count > 0)
+        // Setup Train 1 - going LEFT to RIGHT
+        if (enableTrain1 && train1 != null)
         {
-            selectedPath = paths[0];
+            // Build a fresh path for train 1
+            train1Path = new TrackPath();
+            train1Path.BuildFromEndpoints(startTrack, endTrack);
             
-            if (selectedPath.Waypoints.Count > 0)
+            if (train1Path.Waypoints.Count > 0)
             {
-                // Check which end of the path is more to the left (smaller X)
-                float startX = selectedPath.Waypoints[0].x;
-                float endX = selectedPath.Waypoints[selectedPath.Waypoints.Count - 1].x;
+                // Make sure it goes left to right
+                float startX = train1Path.Waypoints[0].x;
+                float endX = train1Path.Waypoints[train1Path.Waypoints.Count - 1].x;
                 
-                bool pathGoesLeftToRight = startX < endX;
+                if (startX > endX)
+                {
+                    Debug.Log("Train1: Reversing path to go left-to-right");
+                    train1Path.Reverse();
+                }
                 
-                if (startFromLeft && !pathGoesLeftToRight)
-                {
-                    // We want left-to-right but path goes right-to-left, reverse it
-                    Debug.Log($"Reversing path to go left-to-right (was X={startX:F2} → X={endX:F2})");
-                    selectedPath.Reverse();
-                }
-                else if (!startFromLeft && pathGoesLeftToRight)
-                {
-                    // We want right-to-left but path goes left-to-right, reverse it
-                    Debug.Log($"Reversing path to go right-to-left (was X={startX:F2} → X={endX:F2})");
-                    selectedPath.Reverse();
-                }
-                else
-                {
-                    Debug.Log($"Path direction is correct: X={startX:F2} → X={endX:F2}");
-                }
+                train1.SetPath(train1Path, 0f);
+                Debug.Log($"Train1: Going LEFT → RIGHT, starting at {train1.transform.position}");
             }
         }
         
-        if (selectedPath == null || selectedPath.Waypoints.Count == 0)
+        // Setup Train 2 - going RIGHT to LEFT (collision course!)
+        if (enableTrain2 && train2 != null)
         {
-            Debug.LogError("No valid path selected!");
-            return;
+            // Build a completely separate path for train 2
+            train2Path = new TrackPath();
+            train2Path.BuildFromEndpoints(startTrack, endTrack);
+            
+            if (train2Path.Waypoints.Count > 0)
+            {
+                // Make sure it goes right to left
+                float startX = train2Path.Waypoints[0].x;
+                float endX = train2Path.Waypoints[train2Path.Waypoints.Count - 1].x;
+                
+                if (startX < endX)
+                {
+                    Debug.Log("Train2: Reversing path to go right-to-left");
+                    train2Path.Reverse();
+                }
+                
+                train2.SetPath(train2Path, 0f);
+                Debug.Log($"Train2: Going RIGHT → LEFT, starting at {train2.transform.position}");
+            }
         }
         
-        Debug.Log($"Selected path: {selectedPath.StartTrack?.name} → {selectedPath.EndTrack?.name}");
-        Debug.Log($"Path tracks: {string.Join(" → ", System.Linq.Enumerable.Select(selectedPath.TrackPieces, t => t.name))}");
-        
-        // Assign train to path at the start
-        train.SetPath(selectedPath, 0f);
-        
-        Debug.Log($"Train assigned to path at position {train.transform.position}");
         Debug.Log("=== TEST TRAIN MOVEMENT COMPLETE ===");
+        Debug.Log(">>> Toggle the switch to divert Train1 and avoid collision! <<<");
     }
 }

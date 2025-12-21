@@ -136,17 +136,18 @@ namespace OffTheRails.Tracks
             }
             
             // Step 5: Reassign trains to rebuilt paths, maintaining their position AND direction
-            // BUT only if the train hasn't passed the junction yet
+            // BUT only if:
+            // - The train hasn't passed the junction yet AND
+            // - The train is approaching from the FACING point direction (CP[0])
+            // Trains approaching from trailing point (CP[1] or CP[2]) are not affected by switch
             foreach (var train in allTrains)
             {
                 if (!trainStates.ContainsKey(train)) continue;
                 
                 var state = trainStates[train];
                 
-                // Check if the train has already passed this junction
-                // by seeing if the junction is still ahead of the train on its current path
                 TrackPath currentPath = train.GetCurrentPath();
-                bool hasPassedJunction = true; // Default to true (don't reassign)
+                bool shouldReassign = false;
                 
                 if (currentPath != null && ParentTrack != null)
                 {
@@ -172,25 +173,46 @@ namespace OffTheRails.Tracks
                             distanceSoFar += trackLength;
                         }
                         
-                        // Train hasn't passed junction if it's before the junction in the path
-                        hasPassedJunction = trainTrackIndex >= junctionIndex;
+                        bool hasPassedJunction = trainTrackIndex >= junctionIndex;
                         
-                        Debug.Log($"[Train {train.name}] Junction at index {junctionIndex}, train at index {trainTrackIndex}, hasPassedJunction={hasPassedJunction}");
+                        // Check if train is approaching from facing point (CP[0]) or trailing point (CP[1]/CP[2])
+                        // Train approaches from facing point if the PREVIOUS track in path connects to CP[0]
+                        bool approachingFromFacingPoint = false;
+                        
+                        if (junctionIndex > 0)
+                        {
+                            TrackPiece prevTrack = currentPath.TrackPieces[junctionIndex - 1];
+                            var junctionCPs = ParentTrack.ConnectionPoints;
+                            
+                            // Check if prevTrack is connected to CP[0] (the facing/common point)
+                            if (junctionCPs.Length >= 1 && junctionCPs[0].IsConnected && 
+                                junctionCPs[0].ConnectedTo != null &&
+                                junctionCPs[0].ConnectedTo.ParentTrack == prevTrack)
+                            {
+                                approachingFromFacingPoint = true;
+                            }
+                        }
+                        
+                        Debug.Log($"[Train {train.name}] Junction at index {junctionIndex}, train at index {trainTrackIndex}, " +
+                                  $"hasPassedJunction={hasPassedJunction}, approachingFromFacingPoint={approachingFromFacingPoint}");
+                        
+                        // Only reassign if train hasn't passed AND is approaching from facing point
+                        shouldReassign = !hasPassedJunction && approachingFromFacingPoint;
                     }
                     else
                     {
-                        // Junction not in current path - train is on a different route
-                        hasPassedJunction = true;
+                        // Junction not in current path - train is on a different route, don't touch it
+                        Debug.Log($"[Train {train.name}] Junction not in path, keeping current path");
                     }
                 }
                 
-                if (hasPassedJunction)
+                if (!shouldReassign)
                 {
-                    Debug.Log($"[Train {train.name}] Already passed junction, keeping current path");
+                    Debug.Log($"[Train {train.name}] Keeping current path (passed junction or trailing point approach)");
                     continue;
                 }
                 
-                // Train hasn't passed junction yet - reassign to new path
+                // Train hasn't passed junction yet AND is approaching from facing point - reassign to new path
                 TrackPath newPath = TrackManager.Instance.GetPathNearestTo(state.WorldPosition);
                 
                 if (newPath == null || newPath.Waypoints.Count == 0)
