@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 411a53daac5b21049ac245973ec0db8a
+guid: 50fa38856405d164c94bbaa841521ba4
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -911073917788819530
-    second: Pavement9 1_0
+      213: -8015850701244393012
+    second: Pavement_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -152,23 +152,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Pavement9 1_0
+      name: Pavement_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 134
-        height: 470
+        width: 201
+        height: 533
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 6bfe21e49173b53f0800000000000000
-      internalID: -911073917788819530
+      spriteID: cc913cbc14af1c090800000000000000
+      internalID: -8015850701244393012
       vertices: []
       indices: 
       edges: []
@@ -177,7 +177,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: e900d2877838b5a4d91ccedcfef208bc
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -187,7 +187,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Pavement9 1_0: -911073917788819530
+      Pavement_0: -8015850701244393012
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
