@@ -136,13 +136,61 @@ namespace OffTheRails.Tracks
             }
             
             // Step 5: Reassign trains to rebuilt paths, maintaining their position AND direction
+            // BUT only if the train hasn't passed the junction yet
             foreach (var train in allTrains)
             {
                 if (!trainStates.ContainsKey(train)) continue;
                 
                 var state = trainStates[train];
                 
-                // Find the path that the train should now be on
+                // Check if the train has already passed this junction
+                // by seeing if the junction is still ahead of the train on its current path
+                TrackPath currentPath = train.GetCurrentPath();
+                bool hasPassedJunction = true; // Default to true (don't reassign)
+                
+                if (currentPath != null && ParentTrack != null)
+                {
+                    // Find where the junction is in the current path
+                    int junctionIndex = currentPath.TrackPieces.IndexOf(ParentTrack);
+                    
+                    if (junctionIndex >= 0)
+                    {
+                        // Find where the train currently is in the path
+                        int trainTrackIndex = -1;
+                        float distanceSoFar = 0f;
+                        
+                        for (int i = 0; i < currentPath.TrackPieces.Count; i++)
+                        {
+                            var track = currentPath.TrackPieces[i];
+                            float trackLength = track.Length;
+                            
+                            if (distanceSoFar + trackLength >= state.DistanceAlongPath)
+                            {
+                                trainTrackIndex = i;
+                                break;
+                            }
+                            distanceSoFar += trackLength;
+                        }
+                        
+                        // Train hasn't passed junction if it's before the junction in the path
+                        hasPassedJunction = trainTrackIndex >= junctionIndex;
+                        
+                        Debug.Log($"[Train {train.name}] Junction at index {junctionIndex}, train at index {trainTrackIndex}, hasPassedJunction={hasPassedJunction}");
+                    }
+                    else
+                    {
+                        // Junction not in current path - train is on a different route
+                        hasPassedJunction = true;
+                    }
+                }
+                
+                if (hasPassedJunction)
+                {
+                    Debug.Log($"[Train {train.name}] Already passed junction, keeping current path");
+                    continue;
+                }
+                
+                // Train hasn't passed junction yet - reassign to new path
                 TrackPath newPath = TrackManager.Instance.GetPathNearestTo(state.WorldPosition);
                 
                 if (newPath == null || newPath.Waypoints.Count == 0)
