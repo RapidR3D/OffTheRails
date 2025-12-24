@@ -1,0 +1,9 @@
+OVDF v1.1
+TestTrainMovement, Assembly-CSharp
+MetaGuid:81c602492d174744e903fc4307b6b993
+
+# enableTrain1
++ [Sirenix.OdinInspector.GUIColorAttribute]
+
+# enableTrain2
++ [Sirenix.OdinInspector.GUIColorAttribute]

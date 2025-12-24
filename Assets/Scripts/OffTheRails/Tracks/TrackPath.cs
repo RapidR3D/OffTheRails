@@ -96,6 +96,127 @@ namespace OffTheRails.Tracks
         }
         
         /// <summary>
+        /// Build a path from explicit route segments (from RouteDefinition).
+        /// This bypasses automatic pathfinding and uses the exact tracks specified.
+        /// </summary>
+        public void BuildFromRouteSegments(List<RouteSegment> segments)
+        {
+            Clear();
+            
+            if (segments == null || segments.Count == 0)
+            {
+                Debug.LogWarning("[TrackPath] No segments provided");
+                return;
+            }
+            
+            // Store junction info for waypoint generation
+            routeSegments = segments;
+            
+            // Add all tracks
+            foreach (var seg in segments)
+            {
+                if (seg.track != null)
+                    TrackPieces.Add(seg.track);
+            }
+            
+            if (TrackPieces.Count == 0)
+            {
+                Debug.LogWarning("[TrackPath] No valid tracks in segments");
+                return;
+            }
+            
+            StartTrack = TrackPieces[0];
+            EndTrack = TrackPieces[TrackPieces.Count - 1];
+            
+            // Generate waypoints using route segment info for junctions
+            GenerateWaypointsFromRouteSegments();
+            CalculateTotalLength();
+            CheckIfLoop();
+            
+            Debug.Log($"[TrackPath] Built path from route: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints, length={TotalLength:F1}");
+        }
+        
+        // Store route segments for junction waypoint generation
+        private List<RouteSegment> routeSegments;
+        
+        /// <summary>
+        /// Generate waypoints using explicit route segment entry/exit points for junctions
+        /// </summary>
+        private void GenerateWaypointsFromRouteSegments()
+        {
+            Waypoints.Clear();
+            
+            if (TrackPieces.Count == 0 || routeSegments == null)
+                return;
+            
+            for (int i = 0; i < TrackPieces.Count; i++)
+            {
+                var track = TrackPieces[i];
+                var segment = (i < routeSegments.Count) ? routeSegments[i] : null;
+                Vector2[] trackWaypoints;
+                
+                // For junctions, use the explicit entry/exit CPs from the route segment
+                if (track.Type == TrackType.Junction && segment != null)
+                {
+                    int entryCP = segment.entryCP;
+                    int exitCP = segment.exitCP;
+                    
+                    Debug.Log($"[GenerateWaypointsFromRoute] Junction {track.name}: CP[{entryCP}] → CP[{exitCP}]");
+                    
+                    trackWaypoints = GenerateJunctionWaypointsLocal(track, entryCP, exitCP);
+                }
+                else
+                {
+                    // Normal track - use its waypoints
+                    trackWaypoints = track.WorldWaypoints;
+                }
+                
+                if (trackWaypoints == null || trackWaypoints.Length == 0)
+                {
+                    Debug.LogWarning($"[GenerateWaypointsFromRoute] Track {track.name} has no waypoints!");
+                    continue;
+                }
+                
+                if (i == 0 || Waypoints.Count == 0)
+                {
+                    Waypoints.AddRange(trackWaypoints);
+                }
+                else
+                {
+                    // Determine if we need to reverse waypoints to connect properly
+                    Vector2 lastWaypoint = Waypoints[Waypoints.Count - 1];
+                    Vector2 firstOfNew = trackWaypoints[0];
+                    Vector2 lastOfNew = trackWaypoints[trackWaypoints.Length - 1];
+                    
+                    float distToFirst = Vector2.Distance(lastWaypoint, firstOfNew);
+                    float distToLast = Vector2.Distance(lastWaypoint, lastOfNew);
+                    
+                    float tolerance = 1.5f;
+                    
+                    if (distToLast < distToFirst)
+                    {
+                        // Reverse the waypoints
+                        int startIndex = (distToLast < tolerance) ? trackWaypoints.Length - 2 : trackWaypoints.Length - 1;
+                        startIndex = Mathf.Max(0, startIndex);
+                        for (int j = startIndex; j >= 0; j--)
+                        {
+                            Waypoints.Add(trackWaypoints[j]);
+                        }
+                    }
+                    else
+                    {
+                        // Add waypoints in order
+                        int startIndex = (distToFirst < tolerance) ? 1 : 0;
+                        for (int j = startIndex; j < trackWaypoints.Length; j++)
+                        {
+                            Waypoints.Add(trackWaypoints[j]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
         /// Rebuild this path using current switch states
         /// Call this when any switch in the network changes
         /// </summary>
@@ -107,19 +228,28 @@ namespace OffTheRails.Tracks
                 return;
             }
             
-            float oldLength = TotalLength;
-            Clear();
+            Debug.Log($"[TrackPath] Rebuilding path from {StartTrack.name} to {EndTrack.name}...");
             
+            float oldLength = TotalLength;
+            
+            // Don't clear yet - we might need to keep the old path if rebuild fails
             List<TrackPiece> route = new List<TrackPiece>();
             HashSet<TrackPiece> visited = new HashSet<TrackPiece>();
             
             if (FindPathDFS(StartTrack, EndTrack, route, visited))
             {
+                // Success - update the path
+                Clear();
                 TrackPieces.AddRange(route);
                 GenerateWaypoints();
                 CalculateTotalLength();
                 
                 Debug.Log($"[TrackPath] Rebuilt path: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints, length changed from {oldLength:F1} to {TotalLength:F1}");
+            }
+            else
+            {
+                Debug.LogWarning($"[TrackPath] REBUILD FAILED: No path exists from {StartTrack.name} to {EndTrack.name} with current switch states!");
+                // Keep the old path data so the train doesn't get stranded
             }
         }
         
@@ -171,6 +301,7 @@ namespace OffTheRails.Tracks
             for (int i = 0; i < TrackPieces.Count; i++)
             {
                 var track = TrackPieces[i];
+                Vector2[] trackWaypoints;
                 
                 // For junctions, we need to generate waypoints based on which CPs
                 // connect to the previous and next tracks in the path
@@ -201,26 +332,22 @@ namespace OffTheRails.Tracks
                     
                     Debug.Log($"[GenerateWaypoints] Junction {track.name}: entry=CP[{entryCP}] from {prevTrack?.name}, exit=CP[{exitCP}] to {nextTrack?.name}");
                     
-                    // Generate waypoints for the specific entry/exit CPs
+                    // Generate waypoints locally for this path (don't modify the TrackPiece)
                     if (entryCP >= 0 && exitCP >= 0)
                     {
-                        track.GenerateJunctionWaypointsForCPs(entryCP, exitCP);
+                        trackWaypoints = GenerateJunctionWaypointsLocal(track, entryCP, exitCP);
                     }
                     else
                     {
-                        // Fallback to default generation
-                        track.InvalidateWaypointCache();
-                        track.GenerateWaypoints();
+                        // Fallback to track's default waypoints
+                        trackWaypoints = track.WorldWaypoints;
                     }
                 }
                 else
                 {
-                    // Normal track - regenerate waypoints
-                    track.InvalidateWaypointCache();
-                    track.GenerateWaypoints();
+                    // Normal track - use its waypoints
+                    trackWaypoints = track.WorldWaypoints;
                 }
-                
-                Vector2[] trackWaypoints = track.WorldWaypoints;
                 
                 if (trackWaypoints == null || trackWaypoints.Length == 0)
                 {
@@ -265,6 +392,49 @@ namespace OffTheRails.Tracks
                     }
                 }
             }
+        }
+        
+        /// <summary>
+        /// Generate junction waypoints locally for this path without modifying the TrackPiece.
+        /// This allows multiple paths to use the same junction with different directions.
+        /// </summary>
+        private Vector2[] GenerateJunctionWaypointsLocal(TrackPiece junction, int entryCPIndex, int exitCPIndex)
+        {
+            var connectionPoints = junction.ConnectionPoints;
+            ConnectionPoint entryCP = connectionPoints[entryCPIndex];
+            ConnectionPoint exitCP = connectionPoints[exitCPIndex];
+            
+            Vector2 start = entryCP.WorldPosition;
+            Vector2 end = exitCP.WorldPosition;
+            Vector2 startDir = entryCP.WorldDirection;
+            Vector2 endDir = exitCP.WorldDirection;
+
+            float distance = Vector2.Distance(start, end);
+            float controlLength = distance * 0.48f; // bezier control strength
+
+            Vector2 p0 = start;
+            Vector2 p3 = end;
+            Vector2 p1 = p0 + startDir * controlLength;
+            Vector2 p2 = p3 + endDir * controlLength;
+
+            int waypointCount = 10;
+            List<Vector2> waypoints = new List<Vector2>();
+            
+            waypoints.Add(p0);
+            for (int i = 1; i < waypointCount - 1; i++)
+            {
+                float t = (float)i / (waypointCount - 1);
+                waypoints.Add(CalculateCubicBezier(t, p0, p1, p2, p3));
+            }
+            waypoints.Add(p3);
+            
+            return waypoints.ToArray();
+        }
+        
+        private Vector2 CalculateCubicBezier(float t, Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3)
+        {
+            float u = 1 - t;
+            return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
         }
         
         private void CalculateTotalLength()

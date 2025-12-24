@@ -207,7 +207,7 @@ namespace OffTheRails.Tracks
                         //Debug.Log($"✓ Mouse IS over switch: {checkTransform.gameObject.name}");
                         return true;
                     }
-                    Debug.Log($"  Checking parent: {checkTransform.name} (no TrackSwitch found)");
+                    // Debug.Log($"  Checking parent: {checkTransform.name} (no TrackSwitch found)");
                     checkTransform = checkTransform.parent;
                 }
                 // Debug.Log($"✗ Hit collider '{hitCollider.gameObject.name}' has no TrackSwitch in hierarchy");

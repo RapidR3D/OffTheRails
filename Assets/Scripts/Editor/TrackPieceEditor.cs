@@ -13,7 +13,7 @@ namespace Editor
 
         private void OnEnable()
         {
-            trackPiece = (OffTheRails.Tracks.TrackPiece)target;
+            trackPiece = (OffTheRails.Tracks.TrackPiece) target;
         }
 
         public override void OnInspectorGUI()

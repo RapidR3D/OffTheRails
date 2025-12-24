@@ -20,6 +20,7 @@ namespace OffTheRails.Trains
         [SerializeField] protected bool rotateToDirection = true;
         [SerializeField] protected float rotationOffset = 0f;
 
+        public RouteDefinition mainLineRoute;
         public float Speed => speed;
         public Tracks.TrackPath CurrentPath => currentPath;
         public float DistanceAlongPath => distanceAlongPath;

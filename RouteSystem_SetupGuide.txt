@@ -1,0 +1,244 @@
+# Route-Based Track System - Setup Guide
+
+## Overview
+This system allows you to manually define train routes through your track network.
+Instead of automatic path discovery, YOU specify exactly which tracks a route uses
+and which connection points to traverse at junctions.
+
+---
+
+## STEP 1: Add the Scripts to Your Project
+
+Copy these files to your Unity project's Scripts folder:
+- RouteDefinition.cs → Assets/Scripts/OffTheRails/Tracks/
+- RouteManager.cs → Assets/Scripts/OffTheRails/Tracks/
+- TrackPath.cs → (replace existing) Assets/Scripts/OffTheRails/Tracks/
+
+Wait for Unity to compile.
+
+---
+
+## STEP 2: Create a RouteManager
+
+1. In your scene Hierarchy, create an empty GameObject
+2. Name it "RouteManager"
+3. Add the RouteManager component (Add Component → OffTheRails → Tracks → RouteManager)
+4. This is where you'll add all your route definitions
+
+---
+
+## STEP 3: Create Your First Route Definition
+
+1. In the Project window, right-click in a folder (e.g., Assets/Data/Routes/)
+2. Select: Create → OffTheRails → Route Definition
+3. Name it something descriptive, e.g., "MainLine_LeftToRight"
+4. Select the new asset to open it in the Inspector
+
+---
+
+## STEP 4: Configure the Route
+
+With your Route Definition selected in the Inspector:
+
+### A. Basic Info
+- **Route Name**: Enter a name (e.g., "MainLine_LeftToRight")
+- **Description**: Optional description of the route
+- **Gizmo Color**: Pick a color for debug visualization
+
+### B. Track Sequence (IMPORTANT!)
+This is where you define the exact path. Add tracks IN ORDER from start to end.
+
+1. Click the "+" button under "Track Sequence" to add a segment
+2. Drag a track piece from the Hierarchy into the Track field
+3. Repeat for EVERY track in the route, in order
+
+**For Y-Junctions (TrackType = Junction):**
+When you add a junction track, extra fields appear:
+- **Entry**: The Connection Point index the train ENTERS from (0, 1, or 2)
+- **Exit**: The Connection Point index the train EXITS to (0, 1, or 2)
+
+Junction CP Reference:
+- CP[0] = Common point (the single-track side, facing point)
+- CP[1] = Straight branch
+- CP[2] = Diverging branch
+
+Valid Junction Traversals:
+- CP[0] → CP[1] (Facing point to straight) ✓
+- CP[0] → CP[2] (Facing point to diverging) ✓
+- CP[1] → CP[0] (Trailing point from straight) ✓
+- CP[2] → CP[0] (Trailing point from diverging) ✓
+- CP[1] → CP[2] (INVALID - would derail!) ✗
+- CP[2] → CP[1] (INVALID - would derail!) ✗
+
+### C. Switch Requirements
+If your route requires switches to be in specific positions:
+
+1. Click "+" under "Switch Requirements"
+2. Drag the TrackSwitch component into the Switch field
+3. Check "Diverging" if the switch must be set to diverging, leave unchecked for straight
+
+The indicator will show:
+- Green = Switch is correctly set for this route
+- Red = Switch needs to be changed
+
+---
+
+## STEP 5: Validate Your Route
+
+1. With your Route Definition selected, click the **"Validate Route"** button
+2. Check the Console for any errors:
+   - "Track is null" = Missing track reference
+   - "Invalid entry/exit CP" = Bad junction configuration  
+   - "Invalid junction traversal" = Impossible CP combination (would derail)
+   - "Not connected to segment X" = Tracks aren't physically connected
+
+3. Fix any errors and validate again until you get "✓ Validation passed!"
+
+---
+
+## STEP 6: Add Route to RouteManager
+
+1. Select your RouteManager GameObject in the Hierarchy
+2. In the Inspector, find the "Route Definitions" list
+3. Click "+" to add a slot
+4. Drag your Route Definition asset into the slot
+5. Repeat for all routes
+
+---
+
+## STEP 7: Test the Routes
+
+1. Click **"Build All Route Paths"** on the RouteManager
+2. Check the Console - you should see messages like:
+   "Built path for route 'MainLine_LeftToRight': 34 waypoints, length=245.3"
+3. Enter Play mode and check the Scene view - route gizmos should appear
+
+---
+
+## STEP 8: Assign Trains to Routes
+
+### Option A: Via Code
+```csharp
+// Get reference to your route definition
+public RouteDefinition mainLineRoute;
+
+void Start()
+{
+    RouteManager.Instance.AssignTrainToRoute(train, mainLineRoute, true);
+    // true = start from beginning, false = start from end
+}
+```
+
+### Option B: By Route Name
+```csharp
+RouteManager.Instance.AssignTrainToRoute(train, "MainLine_LeftToRight", true);
+```
+
+---
+
+## Example: Setting Up Two Collision Course Trains
+
+### Route 1: "MainLine_LeftToRight"
+Segments (in order):
+1. StraightTrack (1) - leftmost track
+2. StraightTrack (2)
+3. StraightTrack (3)
+4. YTrack - Entry: 0, Exit: 1 (straight through)
+5. StraightTrack (4)
+6. CurvedTrack (1)
+7. CurvedTrack (2)
+8. StraightTrack (5)
+9. StraightTrack (6) - rightmost track
+
+Switch Requirements:
+- YTrack Switch: Diverging = false (STRAIGHT)
+
+### Route 2: "MainLine_RightToLeft"
+Same tracks but in REVERSE order:
+1. StraightTrack (6) - rightmost track
+2. StraightTrack (5)
+3. CurvedTrack (2)
+4. CurvedTrack (1)
+5. StraightTrack (4)
+6. YTrack - Entry: 1, Exit: 0 (trailing point from straight)
+7. StraightTrack (3)
+8. StraightTrack (2)
+9. StraightTrack (1) - leftmost track
+
+Switch Requirements:
+- YTrack Switch: Diverging = false (STRAIGHT)
+
+### Route 3: "DivergingBranch_LeftToRight"
+1. StraightTrack (1)
+2. StraightTrack (2)
+3. StraightTrack (3)
+4. YTrack - Entry: 0, Exit: 2 (diverging)
+5. CurvedTrack (3)
+6. CurvedTrack (4)
+7. StraightTrack (7)
+8. StraightTrack (8) - diverging branch endpoint
+
+Switch Requirements:
+- YTrack Switch: Diverging = true (DIVERGING)
+
+---
+
+## Troubleshooting
+
+### "No waypoints generated"
+- Check that all tracks have waypoints (View track in Inspector)
+- Make sure junction Entry/Exit CPs are valid
+
+### "Path length is 0"
+- Tracks may not be connected properly
+- Run "Validate Route" to check connections
+
+### "Train doesn't move"
+- Check that the route path was built (see Console)
+- Verify train has IsActive = true
+
+### "Train goes wrong way through junction"
+- Check Entry/Exit CP values on the junction segment
+- Remember: Entry is where train comes FROM, Exit is where it goes TO
+
+### "Switches not set correctly"
+- Click "Set Switches For Route" on the RouteDefinition
+- Or manually set switches before assigning train
+
+---
+
+## Tips
+
+1. **Name your tracks clearly** - Use descriptive names like "MainLine_Straight_01"
+
+2. **Create bidirectional routes** - For each path, create both directions as separate routes
+
+3. **Use gizmo colors** - Assign different colors to routes for easy debugging
+
+4. **Validate often** - Click "Validate Route" after any changes
+
+5. **Test incrementally** - Start with a simple 3-track route before building complex ones
+
+---
+
+## Quick Reference: Junction CPs
+
+```
+        CP[2] (Diverging)
+           \
+            \
+             \
+==============*======== CP[1] (Straight)
+             CP[0]
+           (Common/
+          Facing Point)
+```
+
+Train approaching from CP[0] (Facing Point):
+- Switch STRAIGHT → Goes to CP[1]
+- Switch DIVERGING → Goes to CP[2]
+
+Train approaching from CP[1] or CP[2] (Trailing Point):
+- Always exits to CP[0]
+- Switch state must match entry point or DERAILMENT!
+
