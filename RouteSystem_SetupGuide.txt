@@ -1,9 +1,13 @@
-# Route-Based Track System - Setup Guide
+# Route-Based Track System - Setup Guide (Updated)
 
 ## Overview
 This system allows you to manually define train routes through your track network.
 Instead of automatic path discovery, YOU specify exactly which tracks a route uses
 and which connection points to traverse at junctions.
+
+**Note:** RouteDefinition is now a MonoBehaviour (scene object) instead of a 
+ScriptableObject (asset file). This prevents references from breaking when you
+exit Play mode.
 
 ---
 
@@ -22,23 +26,24 @@ Wait for Unity to compile.
 
 1. In your scene Hierarchy, create an empty GameObject
 2. Name it "RouteManager"
-3. Add the RouteManager component (Add Component → OffTheRails → Tracks → RouteManager)
-4. This is where you'll add all your route definitions
+3. Add the RouteManager component (Add Component → RouteManager)
+4. This is where you'll reference all your route definitions
 
 ---
 
 ## STEP 3: Create Your First Route Definition
 
-1. In the Project window, right-click in a folder (e.g., Assets/Data/Routes/)
-2. Select: Create → OffTheRails → Route Definition
-3. Name it something descriptive, e.g., "MainLine_LeftToRight"
-4. Select the new asset to open it in the Inspector
+1. In the Hierarchy, right-click on RouteManager (or anywhere in the scene)
+2. Select: Create Empty
+3. Name it something descriptive, e.g., "Route_MainLine_LeftToRight"
+4. (Optional) Parent it under RouteManager to keep things organized
+5. With the new GameObject selected, click Add Component → RouteDefinition
 
 ---
 
 ## STEP 4: Configure the Route
 
-With your Route Definition selected in the Inspector:
+With your Route Definition GameObject selected in the Inspector:
 
 ### A. Basic Info
 - **Route Name**: Enter a name (e.g., "MainLine_LeftToRight")
@@ -85,7 +90,7 @@ The indicator will show:
 
 ## STEP 5: Validate Your Route
 
-1. With your Route Definition selected, click the **"Validate Route"** button
+1. With your Route Definition GameObject selected, click the **"Validate Route"** button
 2. Check the Console for any errors:
    - "Track is null" = Missing track reference
    - "Invalid entry/exit CP" = Bad junction configuration  
@@ -101,7 +106,7 @@ The indicator will show:
 1. Select your RouteManager GameObject in the Hierarchy
 2. In the Inspector, find the "Route Definitions" list
 3. Click "+" to add a slot
-4. Drag your Route Definition asset into the slot
+4. Drag your Route Definition **GameObject** (not the component) into the slot
 5. Repeat for all routes
 
 ---
@@ -136,9 +141,33 @@ RouteManager.Instance.AssignTrainToRoute(train, "MainLine_LeftToRight", true);
 
 ---
 
+## Recommended Hierarchy Organization
+
+```
+Scene
+├── TrackManager
+├── RouteManager
+│   ├── Route_MainLine_LeftToRight    (has RouteDefinition component)
+│   ├── Route_MainLine_RightToLeft    (has RouteDefinition component)
+│   ├── Route_Diverging_LeftToRight   (has RouteDefinition component)
+│   └── Route_Diverging_RightToLeft   (has RouteDefinition component)
+├── Tracks
+│   ├── StraightTrack (1)
+│   ├── StraightTrack (2)
+│   ├── YTrack
+│   └── ...
+└── Trains
+    ├── Train1
+    └── Train2
+```
+
+---
+
 ## Example: Setting Up Two Collision Course Trains
 
 ### Route 1: "MainLine_LeftToRight"
+Create GameObject, add RouteDefinition, configure:
+
 Segments (in order):
 1. StraightTrack (1) - leftmost track
 2. StraightTrack (2)
@@ -154,6 +183,8 @@ Switch Requirements:
 - YTrack Switch: Diverging = false (STRAIGHT)
 
 ### Route 2: "MainLine_RightToLeft"
+Create another GameObject, add RouteDefinition, configure:
+
 Same tracks but in REVERSE order:
 1. StraightTrack (6) - rightmost track
 2. StraightTrack (5)
@@ -168,18 +199,21 @@ Same tracks but in REVERSE order:
 Switch Requirements:
 - YTrack Switch: Diverging = false (STRAIGHT)
 
-### Route 3: "DivergingBranch_LeftToRight"
-1. StraightTrack (1)
-2. StraightTrack (2)
-3. StraightTrack (3)
-4. YTrack - Entry: 0, Exit: 2 (diverging)
-5. CurvedTrack (3)
-6. CurvedTrack (4)
-7. StraightTrack (7)
-8. StraightTrack (8) - diverging branch endpoint
+---
 
-Switch Requirements:
-- YTrack Switch: Diverging = true (DIVERGING)
+## Dynamic Train Controller (Alternative - Recommended!)
+
+If you want trains to dynamically follow switches in real-time (for gameplay where 
+players toggle switches to avoid collisions), use **DynamicTrainController** instead:
+
+1. Add DynamicTrainController component to your train
+2. Set:
+   - **Starting Track**: The track piece to spawn on
+   - **Starting Connection Point**: Which CP to start near
+   - **Travel Away From Start CP**: Direction to travel
+3. Train will automatically follow tracks and check switch states at junctions!
+
+This is simpler and doesn't require defining routes at all.
 
 ---
 
@@ -205,19 +239,26 @@ Switch Requirements:
 - Click "Set Switches For Route" on the RouteDefinition
 - Or manually set switches before assigning train
 
+### "References are null after exiting Play mode"
+- This should no longer happen with MonoBehaviour-based RouteDefinition
+- Make sure you're using scene objects, not asset files
+
 ---
 
 ## Tips
 
-1. **Name your tracks clearly** - Use descriptive names like "MainLine_Straight_01"
+1. **Organize your hierarchy** - Parent route GameObjects under RouteManager
 
-2. **Create bidirectional routes** - For each path, create both directions as separate routes
+2. **Name routes clearly** - Use pattern like "Route_[Line]_[Direction]"
 
-3. **Use gizmo colors** - Assign different colors to routes for easy debugging
+3. **Create bidirectional routes** - For each path, create both directions as separate routes
 
-4. **Validate often** - Click "Validate Route" after any changes
+4. **Use gizmo colors** - Assign different colors to routes for easy debugging
 
-5. **Test incrementally** - Start with a simple 3-track route before building complex ones
+5. **Validate often** - Click "Validate Route" after any changes
+
+6. **Consider DynamicTrainController** - For gameplay with real-time switch control, 
+   it's simpler than pre-defined routes
 
 ---
 
@@ -241,4 +282,3 @@ Train approaching from CP[0] (Facing Point):
 Train approaching from CP[1] or CP[2] (Trailing Point):
 - Always exits to CP[0]
 - Switch state must match entry point or DERAILMENT!
-

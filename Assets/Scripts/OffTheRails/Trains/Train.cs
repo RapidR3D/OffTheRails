@@ -20,11 +20,14 @@ namespace OffTheRails.Trains
         [SerializeField] protected bool rotateToDirection = true;
         [SerializeField] protected float rotationOffset = 0f;
 
-        public RouteDefinition mainLineRoute;
+        private Train trainRD;
+       
         public float Speed => speed;
         public Tracks.TrackPath CurrentPath => currentPath;
         public float DistanceAlongPath => distanceAlongPath;
         public bool IsActive { get; protected set; }
+        
+        public RouteDefinition RouteMR;
 
         protected virtual void Start()
         {
@@ -34,6 +37,8 @@ namespace OffTheRails.Trains
             {
                 Debug.Log($"[Train {name}] Starting with path: {currentPath.TrackPieces.Count} tracks, {currentPath.Waypoints.Count} waypoints");
             }
+
+            RouteManager.Instance.AssignTrainToRoute(trainRD, "RouteMR", true);
         }
 
         protected virtual void Update()

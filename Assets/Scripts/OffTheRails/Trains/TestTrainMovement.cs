@@ -34,7 +34,7 @@ public class TestTrainMovement : MonoBehaviour
     [Button("Setup Trains"), GUIColor(0, 1, 0)]
     [EnableIf("@UnityEngine.Application.isPlaying")]
     
-    public RouteDefinition MainLR;
+    //public RouteDefinition MainLR;
     private void SetupTrains()
     {
         Start();
@@ -63,7 +63,7 @@ public class TestTrainMovement : MonoBehaviour
         // Regenerate paths based on current switch states
         TrackManager.Instance.RegenerateAllPaths();
         
-        RouteManager.Instance.AssignTrainToRoute(train1, MainLR, true);
+        //RouteManager.Instance.AssignTrainToRoute(train1, MainLR, true);
         
         var paths = TrackManager.Instance.GetPaths();
         Debug.Log($"Found {paths.Count} paths");

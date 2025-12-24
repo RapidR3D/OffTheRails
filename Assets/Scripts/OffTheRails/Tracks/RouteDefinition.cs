@@ -7,9 +7,9 @@ namespace OffTheRails.Tracks
     /// <summary>
     /// Defines a route through the track network.
     /// Routes specify an ordered sequence of tracks and required switch states.
+    /// Attach this to a GameObject in the scene (not a ScriptableObject asset).
     /// </summary>
-    [CreateAssetMenu(fileName = "New Route", menuName = "OffTheRails/Route Definition")]
-    public class RouteDefinition : ScriptableObject
+    public class RouteDefinition : MonoBehaviour
     {
         [Title("Route Info")]
         [PropertyOrder(-1)]
