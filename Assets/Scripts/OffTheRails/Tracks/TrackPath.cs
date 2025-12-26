@@ -57,14 +57,14 @@ namespace OffTheRails.Tracks
             // Reverse track pieces list
             TrackPieces.Reverse();
             
-            // Reverse waypoints
+            // Reverse waypoints - this is all we need!
+            // Don't regenerate - just reverse the existing waypoints
             Waypoints.Reverse();
             
-            // Regenerate waypoints with correct junction directions
-            GenerateWaypoints();
+            // Recalculate length (should be the same, but just in case)
             CalculateTotalLength();
             
-            Debug.Log($"[TrackPath] Reversed path: now {StartTrack?.name} → {EndTrack?.name}");
+            Debug.Log($"[TrackPath] Reversed path: now {StartTrack?.name} → {EndTrack?.name}, first waypoint={Waypoints[0]}, last waypoint={Waypoints[Waypoints.Count-1]}");
         }
 
         /// <summary>

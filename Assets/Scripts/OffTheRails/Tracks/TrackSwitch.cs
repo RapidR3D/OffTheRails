@@ -57,12 +57,34 @@ namespace OffTheRails.Tracks
 
         private void HandleInput()
         {
-            if (mainCamera == null || Mouse.current == null) return;
+            if (mainCamera == null) return;
 
-            Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
-            Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(mouseScreenPos);
+            bool inputDetected = false;
+            Vector2 inputScreenPos = Vector2.zero;
+            bool inputPressed = false;
+
+            // Mouse Input
+            if (Mouse.current != null)
+            {
+                inputScreenPos = Mouse.current.position.ReadValue();
+                inputPressed = Mouse.current.leftButton.wasPressedThisFrame;
+                inputDetected = true;
+            }
+
+            // Touch Input (overrides mouse if present)
+            if (Touchscreen.current != null && Touchscreen.current.touches.Count > 0)
+            {
+                var touch = Touchscreen.current.touches[0];
+                inputScreenPos = touch.position.ReadValue();
+                inputPressed = touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Began;
+                inputDetected = true;
+            }
+
+            if (!inputDetected) return;
+
+            Vector3 worldPos = mainCamera.ScreenToWorldPoint(inputScreenPos);
             
-            Collider2D hitCollider = Physics2D.OverlapPoint(mouseWorldPos);
+            Collider2D hitCollider = Physics2D.OverlapPoint(worldPos);
             bool wasHovering = isHovering;
             
             isHovering = false;
@@ -83,7 +105,7 @@ namespace OffTheRails.Tracks
             if (isHovering != wasHovering && showVisualFeedback)
                 UpdateVisuals();
 
-            if (isHovering && Mouse.current.leftButton.wasPressedThisFrame)
+            if (isHovering && inputPressed)
                 ToggleSwitch();
         }
 

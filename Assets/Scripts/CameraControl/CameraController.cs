@@ -51,30 +51,49 @@ namespace OffTheRails.CameraControl
         {
             if (!enablePanning) return;
 
-            // Check for pan button (Middle Mouse or Right Mouse)
-            if (Mouse.current.middleButton.wasPressedThisFrame || Mouse.current.rightButton.wasPressedThisFrame)
+            // Mouse Panning
+            if (Mouse.current != null)
             {
-                isPanning = true;
+                if (Mouse.current.middleButton.wasPressedThisFrame || Mouse.current.rightButton.wasPressedThisFrame)
+                {
+                    isPanning = true;
+                }
+
+                if (Mouse.current.middleButton.wasReleasedThisFrame || Mouse.current.rightButton.wasReleasedThisFrame)
+                {
+                    isPanning = false;
+                }
+
+                if (isPanning)
+                {
+                    Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+                    PanCamera(mouseDelta);
+                }
             }
 
-            if (Mouse.current.middleButton.wasReleasedThisFrame || Mouse.current.rightButton.wasReleasedThisFrame)
+            // Touch Panning
+            if (Touchscreen.current != null && Touchscreen.current.touches.Count > 0)
             {
-                isPanning = false;
-            }
-
-            if (isPanning)
-            {
-                Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+                var touch = Touchscreen.current.touches[0];
                 
-                // Calculate how many world units one pixel represents
-                // Orthographic size is half the vertical size of the view
-                float unitsPerPixel = (2f * cam.orthographicSize) / Screen.height;
-
-                // Move opposite to drag direction
-                Vector3 move = new Vector3(-mouseDelta.x * unitsPerPixel, -mouseDelta.y * unitsPerPixel, 0);
-                
-                transform.Translate(move, Space.World);
+                if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Moved)
+                {
+                    Vector2 touchDelta = touch.delta.ReadValue();
+                    PanCamera(touchDelta);
+                }
             }
+        }
+
+        private void PanCamera(Vector2 delta)
+        {
+            // Calculate how many world units one pixel represents
+            // Orthographic size is half the vertical size of the view
+            float unitsPerPixel = (2f * cam.orthographicSize) / Screen.height;
+
+            // Move opposite to drag direction
+            Vector3 move = new Vector3(-delta.x * unitsPerPixel, -delta.y * unitsPerPixel, 0);
+            
+            transform.Translate(move, Space.World);
         }
 
         private void HandleZoom()

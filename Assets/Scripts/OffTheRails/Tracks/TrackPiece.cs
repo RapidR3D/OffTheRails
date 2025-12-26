@@ -198,12 +198,12 @@ namespace OffTheRails.Tracks
             if (TrackSwitch != null && TrackSwitch.IsDiverging)
             {
                 endPoint = ConnectionPoints[2]; // Diverging path
-                Debug.Log($"[Junction {name}] Switch is DIVERGING - waypoints go to ConnectionPoint[2]");
+                // Debug.Log($"[Junction {name}] Switch is DIVERGING - waypoints go to ConnectionPoint[2]");
             }
             else
             {
                 endPoint = ConnectionPoints[1]; // Straight path
-                Debug.Log($"[Junction {name}] Switch is STRAIGHT - waypoints go to ConnectionPoint[1]");
+                // Debug.Log($"[Junction {name}] Switch is STRAIGHT - waypoints go to ConnectionPoint[1]");
             }
             
             GenerateBezierWaypoints(startPoint, endPoint);

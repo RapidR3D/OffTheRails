@@ -121,7 +121,10 @@ namespace OffTheRails.Tracks
         /// <summary>
         /// Assign a train to a specific route
         /// </summary>
-        public bool AssignTrainToRoute(Train train, RouteDefinition route, bool startFromBeginning = true)
+        /// <param name="train">The train to assign</param>
+        /// <param name="route">The route to follow</param>
+        /// <param name="forwardDirection">If true, travel in segment order. If false, travel in reverse.</param>
+        public bool AssignTrainToRoute(Train train, RouteDefinition route, bool forwardDirection = true)
         {
             if (train == null || route == null)
             {
@@ -150,17 +153,28 @@ namespace OffTheRails.Tracks
                 return false;
             }
             
-            float startDistance = startFromBeginning ? 0f : path.TotalLength;
-            train.SetPath(path, startDistance);
+            // If reverse direction, create a reversed copy of the path
+            TrackPath pathToUse = path;
+            if (!forwardDirection)
+            {
+                // Create a new path with reversed waypoints
+                pathToUse = new TrackPath();
+                pathToUse.BuildFromRouteSegments(route.segments);
+                pathToUse.Reverse();
+                Debug.Log($"[RouteManager] Reversed path for route '{route.routeName}'");
+            }
             
-            Debug.Log($"[RouteManager] Assigned train '{train.name}' to route '{route.routeName}' at distance {startDistance:F1}");
+            train.SetPath(pathToUse, 0f);
+            
+            string direction = forwardDirection ? "forward" : "reverse";
+            Debug.Log($"[RouteManager] Assigned train '{train.name}' to route '{route.routeName}' ({direction})");
             return true;
         }
         
         /// <summary>
         /// Assign a train to a route by name
         /// </summary>
-        public bool AssignTrainToRoute(Train train, string routeName, bool startFromBeginning = true)
+        public bool AssignTrainToRoute(Train train, string routeName, bool forwardDirection = true)
         {
             var route = routes.Find(r => r.routeName == routeName);
             if (route == null)
@@ -168,7 +182,7 @@ namespace OffTheRails.Tracks
                 Debug.LogError($"[RouteManager] Route '{routeName}' not found");
                 return false;
             }
-            return AssignTrainToRoute(train, route, startFromBeginning);
+            return AssignTrainToRoute(train, route, forwardDirection);
         }
         
         /// <summary>
