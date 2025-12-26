@@ -44,7 +44,7 @@ namespace Editor
             manager.RefreshTracks();
             var tracks = manager.GetAllTracks();
             
-            Debug.Log($"=== SNAP ALL TRACKS START === ({System.Linq.Enumerable.Count(tracks)} tracks)");
+            // Debug.Log($"=== SNAP ALL TRACKS START === ({System.Linq.Enumerable.Count(tracks)} tracks)");
             
             if (tracks == null)
             {
@@ -68,23 +68,23 @@ namespace Editor
                     // Disconnect if already connected
                     if (connectionPoint.IsConnected)
                     {
-                        Debug.Log($" Disconnecting {connectionPoint.name} from {connectionPoint.ConnectedTo?.name}");
+                        // Debug.Log($" Disconnecting {connectionPoint.name} from {connectionPoint.ConnectedTo?.name}");
                         Undo.RecordObject(connectionPoint, "Disconnect Track");
                         connectionPoint.Disconnect();
                     }
 
                     // Find nearest connection
-                    Debug.Log($" Searching for nearest connection to {connectionPoint.name} at {connectionPoint.WorldPosition}");
+                    // Debug.Log($" Searching for nearest connection to {connectionPoint.name} at {connectionPoint.WorldPosition}");
                     ConnectionPoint nearest = connectionPoint.FindNearestConnectionForEditor(5.0f);
 
                     if (nearest != null)
                     {
                         attemptCount++;
-                        Debug.Log($" ✓ Found nearest: {nearest.name} at {nearest.WorldPosition} (distance: {Vector2.Distance(connectionPoint.WorldPosition, nearest.WorldPosition):F3})");
+                        // Debug.Log($" ✓ Found nearest: {nearest.name} at {nearest.WorldPosition} (distance: {Vector2.Distance(connectionPoint.WorldPosition, nearest.WorldPosition):F3})");
                         
                         if (connectionPoint.CalculateAlignmentTo(nearest, out Vector3 position, out Quaternion rotation))
                         {
-                            Debug.Log($" ✓ Alignment calculated: pos={position}, rot={rotation.eulerAngles}");
+                            // Debug.Log($" ✓ Alignment calculated: pos={position}, rot={rotation.eulerAngles}");
                             
                             // Record undo
                             Undo.RecordObject(track.transform, "Snap Track");
@@ -106,7 +106,7 @@ namespace Editor
                                 EditorUtility.SetDirty(connectionPoint);
                                 EditorUtility.SetDirty(nearest);
                                 
-                                Debug.Log($" ✓✓✓ SNAPPED {track.name} to {nearest.ParentTrack.name}");
+                                // Debug.Log($" ✓✓✓ SNAPPED {track.name} to {nearest.ParentTrack.name}");
                             }
                             else
                             {
@@ -122,7 +122,7 @@ namespace Editor
                     }
                     else
                     {
-                        Debug.Log($" ✗ No nearest connection found for {connectionPoint.name}");
+                        // Debug.Log($" ✗ No nearest connection found for {connectionPoint.name}");
                     }
                 }
 
@@ -130,12 +130,12 @@ namespace Editor
                     snapCount++;
             }
 
-            Debug.Log($"=== SNAP ALL TRACKS COMPLETE ===");
-            Debug.Log($"Snap attempts: {attemptCount}, Successful: {snapCount}");
+            // Debug.Log($"=== SNAP ALL TRACKS COMPLETE ===");
+            // Debug.Log($"Snap attempts: {attemptCount}, Successful: {snapCount}");
 
             if (snapCount > 0)
             {
-                Debug.Log($"✓ Regenerating paths.. .");
+                // Debug.Log($"✓ Regenerating paths.. .");
                 manager.RegenerateAllPaths();
                 EditorUtility.SetDirty(manager);
                 SceneView.RepaintAll();

@@ -192,7 +192,7 @@ namespace OffTheRails.Tracks
             ConnectedTo = other;
             other.ConnectedTo = this;
 
-           Debug.Log($"✓Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
+           // Debug.Log($"✓Connected {ParentTrack.gameObject.name} to {other.ParentTrack.gameObject.name}");
         }
 
         /// <summary>
@@ -373,11 +373,11 @@ namespace OffTheRails.Tracks
             // DEBUG VISUALIZATION
             Debug.DrawLine(WorldPosition, target.WorldPosition, Color.yellow, 2f);
             Debug.DrawLine(position, targetPos, Color.cyan, 2f);
-            Debug.Log($"[CalculateAlignment] {gameObject.name} → {target.gameObject.name}");
-            Debug.Log($"Target pos: {targetPos}, Our current pos: {WorldPosition}");
-            Debug.Log($"Local offset: {localOffset}, Rotated offset: {rotatedOffset}");
-            Debug.Log($"Final parent position: {position}");
-            Debug.Log($"Rotation: {ParentTrack.transform.eulerAngles.z:F1}° → {newRotation:F1}°");
+            // Debug.Log($"[CalculateAlignment] {gameObject.name} → {target.gameObject.name}");
+            // Debug.Log($"Target pos: {targetPos}, Our current pos: {WorldPosition}");
+            // Debug.Log($"Local offset: {localOffset}, Rotated offset: {rotatedOffset}");
+            // Debug.Log($"Final parent position: {position}");
+            // Debug.Log($"Rotation: {ParentTrack.transform.eulerAngles.z:F1}° → {newRotation:F1}°");
         
             return true;
         }

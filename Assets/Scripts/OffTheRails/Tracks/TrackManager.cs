@@ -115,12 +115,12 @@ namespace OffTheRails.Tracks
         /// </summary>
         public void RegenerateAllPaths()
         {
-            Debug.Log("[TrackManager] ═══ REGENERATING ALL PATHS ═══");
+            // Debug.Log("[TrackManager] ═══ REGENERATING ALL PATHS ═══");
             paths.Clear();
 
             // Find endpoints (tracks with unconnected connection points)
             List<TrackPiece> endpoints = FindEndpoints();
-            Debug.Log($"[TrackManager] Found {endpoints.Count} endpoints");
+            // Debug.Log($"[TrackManager] Found {endpoints.Count} endpoints");
 
             if (endpoints.Count < 2)
             {
@@ -140,12 +140,12 @@ namespace OffTheRails.Tracks
                     if (path.TrackPieces.Count > 0 && path.Waypoints.Count > 0)
                     {
                         paths.Add(path);
-                        Debug.Log($"✓ Created path: {endpoints[i].name} → {endpoints[j].name} ({path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints)");
+                        // Debug.Log($"✓ Created path: {endpoints[i].name} → {endpoints[j].name} ({path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints)");
                     }
                 }
             }
 
-            Debug.Log($"[TrackManager] ═══ COMPLETE: {paths.Count} paths ═══");
+            // Debug.Log($"[TrackManager] ═══ COMPLETE: {paths.Count} paths ═══");
 
             #if UNITY_EDITOR
             if (!Application.isPlaying) UnityEditor.EditorUtility.SetDirty(this);
@@ -160,14 +160,14 @@ namespace OffTheRails.Tracks
         /// </summary>
         public void RebuildAllPaths()
         {
-            Debug.Log("[TrackManager] ═══ REBUILDING PATHS FOR SWITCH CHANGE ═══");
+            // Debug.Log("[TrackManager] ═══ REBUILDING PATHS FOR SWITCH CHANGE ═══");
 
             foreach (var path in paths)
             {
                 path.RebuildPath();
             }
 
-            Debug.Log($"[TrackManager] ═══ REBUILD COMPLETE ═══");
+            // Debug.Log($"[TrackManager] ═══ REBUILD COMPLETE ═══");
 
             OnPathsRebuilt?.Invoke();
         }
@@ -277,7 +277,7 @@ namespace OffTheRails.Tracks
                                 {
                                     cp.ConnectTo(otherCp);
                                     connectionsFound++;
-                                    Debug.Log($"✓ Connected {track.name} to {otherTrack.name}");
+                                    // Debug.Log($"✓ Connected {track.name} to {otherTrack.name}");
                                 }
                             }
                         }
@@ -285,7 +285,7 @@ namespace OffTheRails.Tracks
                 }
             }
             
-            Debug.Log($"=== Force connection complete: {connectionsFound} ===");
+            // Debug.Log($"=== Force connection complete: {connectionsFound} ===");
             
             if (connectionsFound > 0)
             {

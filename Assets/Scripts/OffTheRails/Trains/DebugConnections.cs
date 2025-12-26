@@ -11,26 +11,26 @@ public class DebugConnections : MonoBehaviour
             return;
         }
 
-        Debug.Log("=== CONNECTION DEBUG ===");
+        // Debug.Log("=== CONNECTION DEBUG ===");
         
         foreach (var track in TrackManager.Instance.GetAllTracks())
         {
-            Debug.Log($"\n--- {track.name} ---");
-            Debug.Log($" Type: {track.Type}");
-            Debug.Log($" Connection Points: {track.ConnectionPoints.Length}");
+            // Debug.Log($"\n--- {track.name} ---");
+            // Debug.Log($" Type: {track.Type}");
+            // Debug.Log($" Connection Points: {track.ConnectionPoints.Length}");
             
             for (int i = 0; i < track.ConnectionPoints.Length; i++)
             {
                 var cp = track.ConnectionPoints[i];
-                Debug.Log($" CP[{i}]: IsConnected={cp.IsConnected}, ConnectedTo={cp.ConnectedTo?.ParentTrack?.name ?? "NULL"}");
-                Debug.Log($" Position={cp.WorldPosition}, Direction={cp.WorldDirection}");
+                // Debug.Log($" CP[{i}]: IsConnected={cp.IsConnected}, ConnectedTo={cp.ConnectedTo?.ParentTrack?.name ?? "NULL"}");
+                // Debug.Log($" Position={cp.WorldPosition}, Direction={cp.WorldDirection}");
             }
             
             var connected = track.GetConnectedTracks();
-            Debug.Log($" GetConnectedTracks() returned: {connected.Count} tracks");
+            // Debug.Log($" GetConnectedTracks() returned: {connected.Count} tracks");
             foreach (var c in connected)
             {
-                Debug.Log($" - {c.name}");
+                // Debug.Log($" - {c.name}");
             }
         }
     }

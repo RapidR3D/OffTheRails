@@ -254,7 +254,7 @@ namespace OffTheRails.Trains
             emissionModule = smokeParticles.emission;
             mainModule = smokeParticles.main;
             
-            Debug.Log("Created smoke particle system! You may want to adjust the material and sorting layer.");
+            // Debug.Log("Created smoke particle system! You may want to adjust the material and sorting layer.");
             
             #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);
@@ -288,7 +288,7 @@ namespace OffTheRails.Trains
                     DestroyImmediate(smokeParticles.gameObject);
                 }
                 smokeParticles = null;
-                Debug.Log("Removed smoke particle system");
+                // Debug.Log("Removed smoke particle system");
             }
         }
         

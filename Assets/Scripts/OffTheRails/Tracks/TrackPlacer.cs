@@ -87,7 +87,7 @@ namespace OffTheRails.Tracks
                 Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
             }
 
-            Debug.Log($"TrackPlacer initialized. Layer mask value: {trackLayerMask.value}");
+            // Debug.Log($"TrackPlacer initialized. Layer mask value: {trackLayerMask.value}");
         }
 
         private void Update()
@@ -155,20 +155,20 @@ namespace OffTheRails.Tracks
             // Handle placement (Left Click) - but not on switches
             if (Mouse.current.leftButton.wasPressedThisFrame && !isDragging && !isOverSwitch)
             {
-                Debug.Log($"LEFT CLICK: isDragging={isDragging}, isOverSwitch={isOverSwitch}");
+                // Debug.Log($"LEFT CLICK: isDragging={isDragging}, isOverSwitch={isOverSwitch}");
                 
                 // Check if we clicked on an existing track first
                 TrackPiece clickedTrack = FindTrackAtPosition(mousePos);
                 
                 if (clickedTrack != null)
                 {
-                    Debug.Log($"Clicked on existing track: {clickedTrack.name}, selecting it");
+                    // Debug.Log($"Clicked on existing track: {clickedTrack.name}, selecting it");
                     SelectTrack(clickedTrack);
                     return; // Don't start dragging if we selected a track
                 }
 
                 // If we didn't click a track, start dragging new one
-                Debug.Log($"No track clicked, starting drag for new track placement");
+                // Debug.Log($"No track clicked, starting drag for new track placement");
                 DeselectTrack();
                 StartDragging(mousePos);
             }
@@ -293,11 +293,11 @@ namespace OffTheRails.Tracks
 
             if (closestTrack != null)
             {
-                Debug.Log($"Found track via distance check: {closestTrack.name} (distance: {closestDistance:F2})");
+                // Debug.Log($"Found track via distance check: {closestTrack.name} (distance: {closestDistance:F2})");
             }
             else
             {
-                Debug.Log($"No track found within {selectionRadius} units of click position");
+                // Debug.Log($"No track found within {selectionRadius} units of click position");
             }
 
             return closestTrack;
@@ -345,7 +345,7 @@ namespace OffTheRails.Tracks
                     originalTrackColor = selectedTrackRenderer.color;
                     selectedTrackRenderer.color = selectionColor;
                 }
-                Debug.Log($"✓ Selected track: {selectedTrack.name}");
+                // Debug.Log($"✓ Selected track: {selectedTrack.name}");
             }
         }
 
@@ -358,7 +358,7 @@ namespace OffTheRails.Tracks
             {
                 // Restore original color
                 selectedTrackRenderer.color = originalTrackColor;
-                Debug.Log($"Deselected track: {selectedTrack.name}");
+                // Debug.Log($"Deselected track: {selectedTrack.name}");
             }
             
             selectedTrack = null;
@@ -386,7 +386,7 @@ namespace OffTheRails.Tracks
                 selectedTrack = null;
                 selectedTrackRenderer = null;
                 
-                Debug.Log($"✓ Deleted track: {trackName}");
+                // Debug.Log($"✓ Deleted track: {trackName}");
                 
                 // Regenerate paths after deletion
                 if (TrackManager.Instance != null)
@@ -396,7 +396,7 @@ namespace OffTheRails.Tracks
             }
             else
             {
-                Debug.Log("No track selected to delete");
+                // Debug.Log("No track selected to delete");
             }
         }
 
@@ -416,7 +416,7 @@ namespace OffTheRails.Tracks
                     CreatePreview();
                 }
 
-                Debug.Log($"Selected track prefab: {trackPrefabs[selectedPrefabIndex].name}");
+                // Debug.Log($"Selected track prefab: {trackPrefabs[selectedPrefabIndex].name}");
             }
         }
 
@@ -522,7 +522,7 @@ namespace OffTheRails.Tracks
             }
             else
             {
-                Debug.Log("Invalid placement location");
+                // Debug.Log("Invalid placement location");
             }
 
             DestroyPreview();
@@ -647,7 +647,7 @@ namespace OffTheRails.Tracks
                 // Use snapTarget if we have one from the preview
                 if (snapTarget != null)
                 {
-                    Debug.Log($"Attempting to snap to {snapTarget.ParentTrack.name}");
+                    // Debug.Log($"Attempting to snap to {snapTarget.ParentTrack.name}");
                     
                     // Find which of our connection points is closest to snapTarget
                     ConnectionPoint closestPoint = null;
@@ -676,7 +676,7 @@ namespace OffTheRails.Tracks
                             {
                                 closestPoint.ConnectTo(snapTarget);
                                 snapped = true;
-                                Debug.Log($"✓ Connected {track.name} to {snapTarget.ParentTrack.name}");
+                                // Debug.Log($"✓ Connected {track.name} to {snapTarget.ParentTrack.name}");
                             }
                         }
                     }
@@ -723,7 +723,7 @@ namespace OffTheRails.Tracks
                                 {
                                     connectionPoint.ConnectTo(nearest);
                                     snapped = true;
-                                    Debug.Log($"✓ Connected to {nearest.ParentTrack.name}");
+                                    // Debug.Log($"✓ Connected to {nearest.ParentTrack.name}");
                                     break;
                                 }
                             }
@@ -733,7 +733,7 @@ namespace OffTheRails.Tracks
                 
                 if (!snapped)
                 {
-                    Debug.Log($"Placed {track.name} without snapping");
+                    // Debug.Log($"Placed {track.name} without snapping");
                 }
                 else
                 {
@@ -742,7 +742,7 @@ namespace OffTheRails.Tracks
                 }
             }
 
-            Debug.Log($"Placed track: {trackObject.name} at {trackObject.transform.position}");
+            // Debug.Log($"Placed track: {trackObject.name} at {trackObject.transform.position}");
         }
 
         /// <summary>
@@ -793,14 +793,14 @@ namespace OffTheRails.Tracks
             if (existing != null)
             {
                 UnityEditor.Selection.activeGameObject = existing.gameObject;
-                Debug.Log("TrackPlacer already exists in scene");
+                // Debug.Log("TrackPlacer already exists in scene");
                 return;
             }
 
             GameObject placerObject = new GameObject("TrackPlacer");
             placerObject.AddComponent<TrackPlacer>();
             UnityEditor.Selection.activeGameObject = placerObject;
-            Debug.Log("Created TrackPlacer in scene");
+            // Debug.Log("Created TrackPlacer in scene");
         }
 #endif
     }

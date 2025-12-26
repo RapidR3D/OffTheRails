@@ -65,7 +65,7 @@ namespace OffTheRails.Trains
                 }
             }
             
-            Debug.Log($"[TrainRouteAssigner] Assigned {successCount}/{assignments.Count} trains to routes");
+            // Debug.Log($"[TrainRouteAssigner] Assigned {successCount}/{assignments.Count} trains to routes");
         }
         
         private System.Collections.IEnumerator AssignAllWithDelay()
@@ -96,7 +96,7 @@ namespace OffTheRails.Trains
                 }
             }
             
-            Debug.Log($"[TrainRouteAssigner] Assigned {successCount}/{assignments.Count} trains to routes");
+            // Debug.Log($"[TrainRouteAssigner] Assigned {successCount}/{assignments.Count} trains to routes");
         }
         
         /// <summary>

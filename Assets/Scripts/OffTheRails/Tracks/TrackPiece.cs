@@ -234,7 +234,7 @@ namespace OffTheRails.Tracks
             ConnectionPoint entryCP = ConnectionPoints[entryCPIndex];
             ConnectionPoint exitCP = ConnectionPoints[exitCPIndex];
             
-            Debug.Log($"[Junction {name}] Generating waypoints for path: CP[{entryCPIndex}] → CP[{exitCPIndex}]");
+            // Debug.Log($"[Junction {name}] Generating waypoints for path: CP[{entryCPIndex}] → CP[{exitCPIndex}]");
             
             GenerateBezierWaypoints(entryCP, exitCP);
         }
@@ -308,7 +308,7 @@ namespace OffTheRails.Tracks
                     }
                 }
                 
-                Debug.Log($"[{name}] GetConnectedTracks (switch={TrackSwitch.IsDiverging}): returning {connectedTracks.Count} tracks");
+                // Debug.Log($"[{name}] GetConnectedTracks (switch={TrackSwitch.IsDiverging}): returning {connectedTracks.Count} tracks");
             }
             else
             {

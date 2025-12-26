@@ -84,21 +84,21 @@ public class SceneCursorPosition : OdinEditorWindow
     {
         lastCopied = $"new Vector3({cursorWorldPos.x:F2}f, {cursorWorldPos.y:F2}f, {cursorWorldPos.z:F2}f)";
         EditorGUIUtility.systemCopyBuffer = lastCopied;
-        Debug.Log($"Copied: {lastCopied}");
+        // Debug.Log($"Copied: {lastCopied}");
     }
     
     private static void DoCopyPosition2D()
     {
         lastCopied = $"({cursorWorldPos.x:F2}, {cursorWorldPos.y:F2})";
         EditorGUIUtility.systemCopyBuffer = lastCopied;
-        Debug.Log($"Copied: {lastCopied}");
+        // Debug.Log($"Copied: {lastCopied}");
     }
     
     private static void DoCopyAsVector2()
     {
         lastCopied = $"new Vector2({cursorWorldPos.x:F2}f, {cursorWorldPos.y:F2}f)";
         EditorGUIUtility.systemCopyBuffer = lastCopied;
-        Debug.Log($"Copied: {lastCopied}");
+        // Debug.Log($"Copied: {lastCopied}");
     }
     
     private static void OnSceneGUI(SceneView sceneView)

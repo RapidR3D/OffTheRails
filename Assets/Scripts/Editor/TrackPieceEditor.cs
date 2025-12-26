@@ -85,7 +85,7 @@ namespace Editor
                             EditorUtility.SetDirty(connectionPoint);
                             EditorUtility.SetDirty(nearest);
                     
-                            Debug.Log($"Snapped {trackPiece.name} to {nearest.ParentTrack.name}");
+                            // Debug.Log($"Snapped {trackPiece.name} to {nearest.ParentTrack.name}");
                         }
 
                         break;

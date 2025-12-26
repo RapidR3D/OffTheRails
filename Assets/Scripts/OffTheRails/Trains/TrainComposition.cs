@@ -140,7 +140,7 @@ namespace OffTheRails.Trains
                     // Rotate to face direction
                     float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
                     carConfig.car.transform.rotation = Quaternion.Euler(0, 0, angle);
-                    Debug.Log($"Car {i}: distBehind={distanceToCarCenter:F2}, pos={position}, dir={direction}");
+                    // Debug.Log($"Car {i}: distBehind={distanceToCarCenter:F2}, pos={position}, dir={direction}");
                 }
                 
                 // Calculate distance to next car's front coupler
@@ -182,7 +182,7 @@ namespace OffTheRails.Trains
             };
             
             cars.Add(config);
-            Debug.Log($"[TrainComposition] Added car '{carObject.name}'. Total cars: {cars.Count}");
+            // Debug.Log($"[TrainComposition] Added car '{carObject.name}'. Total cars: {cars.Count}");
         }
         
         /// <summary>
@@ -195,7 +195,7 @@ namespace OffTheRails.Trains
             {
                 var removed = cars[cars.Count - 1];
                 cars.RemoveAt(cars.Count - 1);
-                Debug.Log($"[TrainComposition] Removed car '{removed.car?.name}'. Total cars: {cars.Count}");
+                // Debug.Log($"[TrainComposition] Removed car '{removed.car?.name}'. Total cars: {cars.Count}");
             }
         }
         

@@ -115,9 +115,9 @@ namespace OffTheRails.Tracks
         /// </summary>
         public void ToggleSwitch()
         {
-            Debug.Log($"═══════════════════════════════════════════════");
-            Debug.Log($"SWITCH TOGGLE: {gameObject.name}");
-            Debug.Log($"═══════════════════════════════════════════════");
+            // Debug.Log($"═══════════════════════════════════════════════");
+            // Debug.Log($"SWITCH TOGGLE: {gameObject.name}");
+            // Debug.Log($"═══════════════════════════════════════════════");
             
             // Step 1: Store train states before rebuilding
             Train[] allTrains = FindObjectsByType<Train>(FindObjectsSortMode.None);
@@ -135,12 +135,12 @@ namespace OffTheRails.Tracks
                     OldPathLength = train.GetCurrentPath().TotalLength
                 };
                 
-                Debug.Log($"[Train {train.name}] Stored state: pos={trainStates[train].WorldPosition}, dir={trainStates[train].Direction}, dist={trainStates[train].DistanceAlongPath:F1}");
+                // Debug.Log($"[Train {train.name}] Stored state: pos={trainStates[train].WorldPosition}, dir={trainStates[train].Direction}, dist={trainStates[train].DistanceAlongPath:F1}");
             }
             
             // Step 2: Toggle the switch state
             isDiverging = !isDiverging;
-            Debug.Log($"Switch state changed to: {(isDiverging ? "DIVERGING" : "STRAIGHT")}");
+            // Debug.Log($"Switch state changed to: {(isDiverging ? "DIVERGING" : "STRAIGHT")}");
             
             // Step 3: Regenerate waypoints for the junction track
             if (ParentTrack != null)
@@ -215,8 +215,8 @@ namespace OffTheRails.Tracks
                             }
                         }
                         
-                        Debug.Log($"[Train {train.name}] Junction at index {junctionIndex}, train at index {trainTrackIndex}, " +
-                                  $"hasPassedJunction={hasPassedJunction}, approachingFromFacingPoint={approachingFromFacingPoint}");
+                        // Debug.Log($"[Train {train.name}] Junction at index {junctionIndex}, train at index {trainTrackIndex}, " +
+                                 // $"hasPassedJunction={hasPassedJunction}, approachingFromFacingPoint={approachingFromFacingPoint}");
                         
                         // Only reassign if train hasn't passed AND is approaching from facing point
                         shouldReassign = !hasPassedJunction && approachingFromFacingPoint;
@@ -224,13 +224,13 @@ namespace OffTheRails.Tracks
                     else
                     {
                         // Junction not in current path - train is on a different route, don't touch it
-                        Debug.Log($"[Train {train.name}] Junction not in path, keeping current path");
+                        // Debug.Log($"[Train {train.name}] Junction not in path, keeping current path");
                     }
                 }
                 
                 if (!shouldReassign)
                 {
-                    Debug.Log($"[Train {train.name}] Keeping current path (passed junction or trailing point approach)");
+                    // Debug.Log($"[Train {train.name}] Keeping current path (passed junction or trailing point approach)");
                     continue;
                 }
                 
@@ -253,12 +253,12 @@ namespace OffTheRails.Tracks
                 if (dot < 0)
                 {
                     // Path is going the wrong way - reverse it
-                    Debug.Log($"[Train {train.name}] Path direction mismatch (dot={dot:F2}), reversing path");
+                    // Debug.Log($"[Train {train.name}] Path direction mismatch (dot={dot:F2}), reversing path");
                     newPath.Reverse();
                     newDistance = newPath.GetClosestDistanceToPoint(state.WorldPosition);
                 }
                 
-                Debug.Log($"[Train {train.name}] Reassigned to path, distance: {state.DistanceAlongPath:F1} → {newDistance:F1}");
+                // Debug.Log($"[Train {train.name}] Reassigned to path, distance: {state.DistanceAlongPath:F1} → {newDistance:F1}");
                 
                 train.SetPath(newPath, newDistance);
             }
@@ -267,9 +267,9 @@ namespace OffTheRails.Tracks
             UpdateVisuals();
             OnSwitchToggled?.Invoke();
             
-            Debug.Log($"═══════════════════════════════════════════════");
-            Debug.Log($"SWITCH TOGGLE COMPLETE");
-            Debug.Log($"═══════════════════════════════════════════════");
+            // Debug.Log($"═══════════════════════════════════════════════");
+            // Debug.Log($"SWITCH TOGGLE COMPLETE");
+            // Debug.Log($"═══════════════════════════════════════════════");
         }
         
         private struct TrainState

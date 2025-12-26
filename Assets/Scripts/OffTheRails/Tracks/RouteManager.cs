@@ -55,11 +55,11 @@ namespace OffTheRails.Tracks
                 if (path != null)
                 {
                     routePaths[route] = path;
-                    Debug.Log($"[RouteManager] Built path for route '{route.routeName}': {path.Waypoints.Count} waypoints, length={path.TotalLength:F1}");
+                    // Debug.Log($"[RouteManager] Built path for route '{route.routeName}': {path.Waypoints.Count} waypoints, length={path.TotalLength:F1}");
                 }
             }
             
-            Debug.Log($"[RouteManager] Built {routePaths.Count} route paths");
+            // Debug.Log($"[RouteManager] Built {routePaths.Count} route paths");
         }
         
         /// <summary>
@@ -161,13 +161,13 @@ namespace OffTheRails.Tracks
                 pathToUse = new TrackPath();
                 pathToUse.BuildFromRouteSegments(route.segments);
                 pathToUse.Reverse();
-                Debug.Log($"[RouteManager] Reversed path for route '{route.routeName}'");
+                // Debug.Log($"[RouteManager] Reversed path for route '{route.routeName}'");
             }
             
             train.SetPath(pathToUse, 0f);
             
             string direction = forwardDirection ? "forward" : "reverse";
-            Debug.Log($"[RouteManager] Assigned train '{train.name}' to route '{route.routeName}' ({direction})");
+            // Debug.Log($"[RouteManager] Assigned train '{train.name}' to route '{route.routeName}' ({direction})");
             return true;
         }
         

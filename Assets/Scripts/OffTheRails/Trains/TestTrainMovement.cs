@@ -52,7 +52,7 @@ public class TestTrainMovement : MonoBehaviour
     
     void Start()
     {
-        Debug.Log("=== TEST TRAIN MOVEMENT START ===");
+        // Debug.Log("=== TEST TRAIN MOVEMENT START ===");
         
         if (TrackManager.Instance == null)
         {
@@ -66,7 +66,7 @@ public class TestTrainMovement : MonoBehaviour
         //RouteManager.Instance.AssignTrainToRoute(train1, MainLR, true);
         
         var paths = TrackManager.Instance.GetPaths();
-        Debug.Log($"Found {paths.Count} paths");
+        // Debug.Log($"Found {paths.Count} paths");
         
         if (paths.Count == 0)
         {
@@ -78,11 +78,11 @@ public class TestTrainMovement : MonoBehaviour
         for (int i = 0; i < paths.Count; i++)
         {
             var path = paths[i];
-            Debug.Log($"Path {i}: {path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints, length={path.TotalLength:F1}");
+            // Debug.Log($"Path {i}: {path.TrackPieces.Count} tracks, {path.Waypoints.Count} waypoints, length={path.TotalLength:F1}");
         }
         
         // Find all endpoints and log them
-        Debug.Log("=== ALL ENDPOINTS ===");
+        // Debug.Log("=== ALL ENDPOINTS ===");
         var allTracks = TrackManager.Instance.GetAllTracks();
         
         foreach (var track in allTracks)
@@ -98,7 +98,7 @@ public class TestTrainMovement : MonoBehaviour
             }
             if (hasUnconnected)
             {
-                Debug.Log($"Endpoint: {track.name} at position {track.transform.position}");
+                // Debug.Log($"Endpoint: {track.name} at position {track.transform.position}");
             }
         }
         
@@ -127,7 +127,7 @@ public class TestTrainMovement : MonoBehaviour
             float score2 = Vector2.Distance(firstWP, mainLineRight) + Vector2.Distance(lastWP, mainLineLeft);
             float score = Mathf.Min(score1, score2);
             
-            Debug.Log($"Path check: first={firstWP}, last={lastWP}, score={score:F1}");
+            // Debug.Log($"Path check: first={firstWP}, last={lastWP}, score={score:F1}");
             
             if (score < bestScore)
             {
@@ -142,7 +142,7 @@ public class TestTrainMovement : MonoBehaviour
             return;
         }
         
-        Debug.Log($"Selected main line path with score {bestScore:F1}");
+        // Debug.Log($"Selected main line path with score {bestScore:F1}");
         
         // Setup Train 1 - going LEFT to RIGHT on main line
         if (enableTrain1 && train1 != null)
@@ -159,13 +159,13 @@ public class TestTrainMovement : MonoBehaviour
                 
                 if (firstX > lastX)
                 {
-                    Debug.Log("Train1: Reversing path to go left-to-right");
+                    // Debug.Log("Train1: Reversing path to go left-to-right");
                     train1Path.Reverse();
                 }
                 
                 train1.SetPath(train1Path, 0f);
                 train1StartPos = train1Path.Waypoints[0];
-                Debug.Log($"Train1: Going LEFT → RIGHT, starting at {train1.transform.position}, first waypoint={train1Path.Waypoints[0]}");
+                // Debug.Log($"Train1: Going LEFT → RIGHT, starting at {train1.transform.position}, first waypoint={train1Path.Waypoints[0]}");
             }
         }
         
@@ -182,23 +182,23 @@ public class TestTrainMovement : MonoBehaviour
                 float firstX = train2Path.Waypoints[0].x;
                 float lastX = train2Path.Waypoints[train2Path.Waypoints.Count - 1].x;
                 
-                Debug.Log($"Train2 path BEFORE: waypoint[0]={train2Path.Waypoints[0]}, waypoint[last]={train2Path.Waypoints[train2Path.Waypoints.Count-1]}");
+                // Debug.Log($"Train2 path BEFORE: waypoint[0]={train2Path.Waypoints[0]}, waypoint[last]={train2Path.Waypoints[train2Path.Waypoints.Count-1]}");
                 
                 if (firstX < lastX)
                 {
-                    Debug.Log("Train2: Reversing path to go right-to-left");
+                    // Debug.Log("Train2: Reversing path to go right-to-left");
                     train2Path.Reverse();
-                    Debug.Log($"Train2 path AFTER: waypoint[0]={train2Path.Waypoints[0]}, waypoint[last]={train2Path.Waypoints[train2Path.Waypoints.Count-1]}");
+                    // Debug.Log($"Train2 path AFTER: waypoint[0]={train2Path.Waypoints[0]}, waypoint[last]={train2Path.Waypoints[train2Path.Waypoints.Count-1]}");
                 }
                 
                 train2.SetPath(train2Path, 0f);
                 train2StartPos = train2Path.Waypoints[0];
                 
-                Debug.Log($"Train2: Going RIGHT → LEFT, spawned at {train2.transform.position}, first waypoint={train2Path.Waypoints[0]}");
+                // Debug.Log($"Train2: Going RIGHT → LEFT, spawned at {train2.transform.position}, first waypoint={train2Path.Waypoints[0]}");
             }
         }*/
         
-        Debug.Log("=== TEST TRAIN MOVEMENT COMPLETE ===");
-        Debug.Log(">>> Toggle the switch to divert Train1 and avoid collision! <<<");
+        // Debug.Log("=== TEST TRAIN MOVEMENT COMPLETE ===");
+        // Debug.Log(">>> Toggle the switch to divert Train1 and avoid collision! <<<");
     }
 }

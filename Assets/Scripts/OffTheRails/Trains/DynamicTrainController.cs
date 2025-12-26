@@ -164,7 +164,7 @@ namespace OffTheRails.Tracks
                 entryCP = FindEntryCP(track, fromCP);
             }
             
-            Debug.Log($"[DynamicTrain {name}] Setting up on {track.name}: travelAway={travelAway}, fromCP={fromCP} → entry=CP[{entryCP}], exit=CP[{exitCP}]");
+            // Debug.Log($"[DynamicTrain {name}] Setting up on {track.name}: travelAway={travelAway}, fromCP={fromCP} → entry=CP[{entryCP}], exit=CP[{exitCP}]");
             
             GenerateWaypointsForCurrentTrack();
             
@@ -187,7 +187,7 @@ namespace OffTheRails.Tracks
                 SeedPositionHistory();
             }
             
-            Debug.Log($"[DynamicTrain {name}] Initialized on {track.name}, entry=CP[{entryCP}], exit=CP[{exitCP}], waypoints={currentWaypoints.Count}");
+            // Debug.Log($"[DynamicTrain {name}] Initialized on {track.name}, entry=CP[{entryCP}], exit=CP[{exitCP}], waypoints={currentWaypoints.Count}");
         }
         
         /// <summary>
@@ -347,7 +347,7 @@ namespace OffTheRails.Tracks
             // Set the last recorded position to current
             lastRecordedPosition = transform.position;
             
-            Debug.Log($"[DynamicTrain {name}] Seeded {positionHistory.Count} history points, distance range: {positionHistory[0].distance:F1} to {positionHistory[positionHistory.Count-1].distance:F1}");
+            // Debug.Log($"[DynamicTrain {name}] Seeded {positionHistory.Count} history points, distance range: {positionHistory[0].distance:F1} to {positionHistory[positionHistory.Count-1].distance:F1}");
         }
         
         /// <summary>
@@ -452,12 +452,12 @@ namespace OffTheRails.Tracks
             if (currentTrack.Type == TrackType.Junction && entryCP >= 0 && exitCP >= 0)
             {
                 trackWaypoints = GenerateJunctionWaypoints(currentTrack, entryCP, exitCP);
-                Debug.Log($"[DynamicTrain {name}] Generated {trackWaypoints?.Length ?? 0} junction waypoints for {currentTrack.name}");
+                // Debug.Log($"[DynamicTrain {name}] Generated {trackWaypoints?.Length ?? 0} junction waypoints for {currentTrack.name}");
             }
             else
             {
                 trackWaypoints = currentTrack.WorldWaypoints;
-                Debug.Log($"[DynamicTrain {name}] Using {trackWaypoints?.Length ?? 0} track waypoints for {currentTrack.name}");
+                // Debug.Log($"[DynamicTrain {name}] Using {trackWaypoints?.Length ?? 0} track waypoints for {currentTrack.name}");
             }
             
             if (trackWaypoints == null || trackWaypoints.Length == 0)
@@ -476,13 +476,13 @@ namespace OffTheRails.Tracks
             float distFirstToEntry = Vector2.Distance(firstWP, entryCPPos);
             float distLastToEntry = Vector2.Distance(lastWP, entryCPPos);
             
-            Debug.Log($"[DynamicTrain {name}] Waypoint alignment check: firstWP={firstWP}, lastWP={lastWP}, entryCP={entryCPPos}, exitCP={exitCPPos}");
-            Debug.Log($"[DynamicTrain {name}] distFirstToEntry={distFirstToEntry:F2}, distLastToEntry={distLastToEntry:F2}");
+            // Debug.Log($"[DynamicTrain {name}] Waypoint alignment check: firstWP={firstWP}, lastWP={lastWP}, entryCP={entryCPPos}, exitCP={exitCPPos}");
+            // Debug.Log($"[DynamicTrain {name}] distFirstToEntry={distFirstToEntry:F2}, distLastToEntry={distLastToEntry:F2}");
             
             if (distLastToEntry < distFirstToEntry)
             {
                 // Need to reverse - last waypoint is closer to entry
-                Debug.Log($"[DynamicTrain {name}] Reversing waypoints (last WP closer to entry)");
+                // Debug.Log($"[DynamicTrain {name}] Reversing waypoints (last WP closer to entry)");
                 for (int i = trackWaypoints.Length - 1; i >= 0; i--)
                 {
                     currentWaypoints.Add(trackWaypoints[i]);
@@ -491,11 +491,11 @@ namespace OffTheRails.Tracks
             else
             {
                 // Normal order
-                Debug.Log($"[DynamicTrain {name}] Using normal waypoint order");
+                // Debug.Log($"[DynamicTrain {name}] Using normal waypoint order");
                 currentWaypoints.AddRange(trackWaypoints);
             }
             
-            Debug.Log($"[DynamicTrain {name}] Final waypoints: {currentWaypoints.Count}, first={currentWaypoints[0]}, last={currentWaypoints[currentWaypoints.Count-1]}");
+            // Debug.Log($"[DynamicTrain {name}] Final waypoints: {currentWaypoints.Count}, first={currentWaypoints[0]}, last={currentWaypoints[currentWaypoints.Count-1]}");
         }
         
         /// <summary>
@@ -659,7 +659,7 @@ namespace OffTheRails.Tracks
             if (!exitPoint.IsConnected || exitPoint.ConnectedTo == null)
             {
                 // Dead end - end of the line
-                Debug.Log($"[DynamicTrain {name}] Reached end of track at {currentTrack.name} CP[{exitCP}]");
+                // Debug.Log($"[DynamicTrain {name}] Reached end of track at {currentTrack.name} CP[{exitCP}]");
                 OnReachedEnd();
                 return;
             }
@@ -668,7 +668,7 @@ namespace OffTheRails.Tracks
             TrackPiece nextTrack = exitPoint.ConnectedTo.ParentTrack;
             int nextEntryCP = GetCPIndex(nextTrack, exitPoint.ConnectedTo);
             
-            Debug.Log($"[DynamicTrain {name}] Moving from {currentTrack.name} CP[{exitCP}] → {nextTrack.name} CP[{nextEntryCP}]");
+            // Debug.Log($"[DynamicTrain {name}] Moving from {currentTrack.name} CP[{exitCP}] → {nextTrack.name} CP[{nextEntryCP}]");
             
             // Update to next track
             currentTrack = nextTrack;
@@ -691,7 +691,7 @@ namespace OffTheRails.Tracks
         
         private void OnReachedEnd()
         {
-            Debug.Log($"[DynamicTrain {name}] Reached end of line");
+            // Debug.Log($"[DynamicTrain {name}] Reached end of line");
             isActive = false;
             
             if (despawnAtEnd)

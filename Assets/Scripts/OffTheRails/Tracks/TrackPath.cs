@@ -64,7 +64,7 @@ namespace OffTheRails.Tracks
             // Recalculate length (should be the same, but just in case)
             CalculateTotalLength();
             
-            Debug.Log($"[TrackPath] Reversed path: now {StartTrack?.name} → {EndTrack?.name}, first waypoint={Waypoints[0]}, last waypoint={Waypoints[Waypoints.Count-1]}");
+            // Debug.Log($"[TrackPath] Reversed path: now {StartTrack?.name} → {EndTrack?.name}, first waypoint={Waypoints[0]}, last waypoint={Waypoints[Waypoints.Count-1]}");
         }
 
         /// <summary>
@@ -87,7 +87,7 @@ namespace OffTheRails.Tracks
                 CalculateTotalLength();
                 CheckIfLoop();
                 
-                Debug.Log($"[TrackPath] Built path from {start.name} to {end.name}: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints");
+                // Debug.Log($"[TrackPath] Built path from {start.name} to {end.name}: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints");
             }
             else
             {
@@ -133,7 +133,7 @@ namespace OffTheRails.Tracks
             CalculateTotalLength();
             CheckIfLoop();
             
-            Debug.Log($"[TrackPath] Built path from route: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints, length={TotalLength:F1}");
+            // Debug.Log($"[TrackPath] Built path from route: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints, length={TotalLength:F1}");
         }
         
         // Store route segments for junction waypoint generation
@@ -161,7 +161,7 @@ namespace OffTheRails.Tracks
                     int entryCP = segment.entryCP;
                     int exitCP = segment.exitCP;
                     
-                    Debug.Log($"[GenerateWaypointsFromRoute] Junction {track.name}: CP[{entryCP}] → CP[{exitCP}]");
+                    // Debug.Log($"[GenerateWaypointsFromRoute] Junction {track.name}: CP[{entryCP}] → CP[{exitCP}]");
                     
                     trackWaypoints = GenerateJunctionWaypointsLocal(track, entryCP, exitCP);
                 }
@@ -228,7 +228,7 @@ namespace OffTheRails.Tracks
                 return;
             }
             
-            Debug.Log($"[TrackPath] Rebuilding path from {StartTrack.name} to {EndTrack.name}...");
+            // Debug.Log($"[TrackPath] Rebuilding path from {StartTrack.name} to {EndTrack.name}...");
             
             float oldLength = TotalLength;
             
@@ -244,7 +244,7 @@ namespace OffTheRails.Tracks
                 GenerateWaypoints();
                 CalculateTotalLength();
                 
-                Debug.Log($"[TrackPath] Rebuilt path: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints, length changed from {oldLength:F1} to {TotalLength:F1}");
+                // Debug.Log($"[TrackPath] Rebuilt path: {TrackPieces.Count} tracks, {Waypoints.Count} waypoints, length changed from {oldLength:F1} to {TotalLength:F1}");
             }
             else
             {
@@ -330,7 +330,7 @@ namespace OffTheRails.Tracks
                         }
                     }
                     
-                    Debug.Log($"[GenerateWaypoints] Junction {track.name}: entry=CP[{entryCP}] from {prevTrack?.name}, exit=CP[{exitCP}] to {nextTrack?.name}");
+                    // Debug.Log($"[GenerateWaypoints] Junction {track.name}: entry=CP[{entryCP}] from {prevTrack?.name}, exit=CP[{exitCP}] to {nextTrack?.name}");
                     
                     // Generate waypoints locally for this path (don't modify the TrackPiece)
                     if (entryCP >= 0 && exitCP >= 0)

@@ -35,7 +35,7 @@ namespace OffTheRails.Trains
             
             if (currentPath != null)
             {
-                Debug.Log($"[Train {name}] Starting with path: {currentPath.TrackPieces.Count} tracks, {currentPath.Waypoints.Count} waypoints");
+                // Debug.Log($"[Train {name}] Starting with path: {currentPath.TrackPieces.Count} tracks, {currentPath.Waypoints.Count} waypoints");
             }
 
             RouteManager.Instance.AssignTrainToRoute(trainRD, "RouteMR", true);
@@ -101,12 +101,12 @@ namespace OffTheRails.Trains
                 transform.rotation = Quaternion.Euler(0, 0, angle + rotationOffset);
             }
             
-            Debug.Log($"[Train {name}] SetPath: {path.Waypoints.Count} waypoints, starting at distance {distanceAlongPath:F1}/{path.TotalLength:F1}");
+            // Debug.Log($"[Train {name}] SetPath: {path.Waypoints.Count} waypoints, starting at distance {distanceAlongPath:F1}/{path.TotalLength:F1}");
         }
 
         protected virtual void OnReachedPathEnd()
         {
-            Debug.Log($"[Train {name}] Reached end of path");
+            // Debug.Log($"[Train {name}] Reached end of path");
             
             if (despawnAtEnd)
             {

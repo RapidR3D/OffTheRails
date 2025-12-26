@@ -3052,11 +3052,11 @@
             {
                 if (info.ChangeType == CollectionChangeType.Add || info.ChangeType == CollectionChangeType.Insert)
                 {
-                    Debug.Log("Adding to the list!");
+                    // Debug.Log("Adding to the list!");
                 }
                 else if (info.ChangeType == CollectionChangeType.RemoveIndex || info.ChangeType == CollectionChangeType.RemoveValue)
                 {
-                    Debug.Log("Removing from the list!");
+                    // Debug.Log("Removing from the list!");
                 }
             }
             
@@ -3064,11 +3064,11 @@
             {
                 if (info.ChangeType == CollectionChangeType.Add || info.ChangeType == CollectionChangeType.Insert)
                 {
-                    Debug.Log("Finished adding to the list!");
+                    // Debug.Log("Finished adding to the list!");
                 }
                 else if (info.ChangeType == CollectionChangeType.RemoveIndex || info.ChangeType == CollectionChangeType.RemoveValue)
                 {
-                    Debug.Log("Finished removing from the list!");
+                    // Debug.Log("Finished removing from the list!");
                 }
             }
             </code>

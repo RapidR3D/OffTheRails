@@ -340,7 +340,7 @@ namespace Editor
 
             if (snapCount > 0)
             {
-                Debug.Log($"Snapped {snapCount} tracks.");
+                // Debug.Log($"Snapped {snapCount} tracks.");
                 manager.RegenerateAllPaths();
             }
         }
