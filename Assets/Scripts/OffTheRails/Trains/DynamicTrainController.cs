@@ -418,7 +418,7 @@ namespace OffTheRails.Tracks
                     int expectedEntry = track.TrackSwitch.IsDiverging ? 2 : 1;
                     if (entryFromCP != expectedEntry)
                     {
-                        Debug.LogWarning($"[DynamicTrain {name}] DERAILMENT! Entered junction {track.name} from CP[{entryFromCP}] but switch is set for CP[{expectedEntry}]");
+                        // Debug.LogWarning($"[DynamicTrain {name}] DERAILMENT! Entered junction {track.name} from CP[{entryFromCP}] but switch is set for CP[{expectedEntry}]");
                         // Could trigger derailment event here
                     }
                     return 0;
@@ -462,7 +462,7 @@ namespace OffTheRails.Tracks
             
             if (trackWaypoints == null || trackWaypoints.Length == 0)
             {
-                Debug.LogWarning($"[DynamicTrain {name}] No waypoints for track {currentTrack.name}");
+                // Debug.LogWarning($"[DynamicTrain {name}] No waypoints for track {currentTrack.name}");
                 return;
             }
             

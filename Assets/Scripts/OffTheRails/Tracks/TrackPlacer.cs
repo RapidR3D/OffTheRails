@@ -84,7 +84,7 @@ namespace OffTheRails.Tracks
 
             if (trackPrefabs == null || trackPrefabs.Length == 0)
             {
-                Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
+                // Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
             }
 
             // Debug.Log($"TrackPlacer initialized. Layer mask value: {trackLayerMask.value}");
@@ -244,7 +244,7 @@ namespace OffTheRails.Tracks
         {
             if (TrackManager.Instance == null)
             {
-                Debug.LogWarning("TrackManager instance not found");
+                // Debug.LogWarning("TrackManager instance not found");
                 return null;
             }
 
@@ -427,7 +427,7 @@ namespace OffTheRails.Tracks
         {
             if (trackPrefabs == null || trackPrefabs.Length == 0)
             {
-                Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
+                // Debug.LogWarning("TrackPlacer: No track prefabs assigned!");
                 return;
             }
 
@@ -439,7 +439,7 @@ namespace OffTheRails.Tracks
 
             if (trackPrefabs[selectedPrefabIndex] == null)
             {
-                Debug.LogWarning($"TrackPlacer: Track prefab at index {selectedPrefabIndex} is null!");
+                // Debug.LogWarning($"TrackPlacer: Track prefab at index {selectedPrefabIndex} is null!");
                 return;
             }
             

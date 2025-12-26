@@ -82,7 +82,7 @@ namespace OffTheRails.Trains
             
             if (path == null || path.Waypoints.Count == 0)
             {
-                Debug.LogWarning($"[Train {name}] SetPath called with invalid path");
+                // Debug.LogWarning($"[Train {name}] SetPath called with invalid path");
                 return;
             }
             

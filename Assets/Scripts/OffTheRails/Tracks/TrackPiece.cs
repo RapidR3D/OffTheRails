@@ -91,7 +91,7 @@ namespace OffTheRails.Tracks
 
             if (ConnectionPoints.Length == 0)
             {
-                Debug.LogWarning($"TrackPiece {gameObject.name} has no connection points!", this);
+                // Debug.LogWarning($"TrackPiece {gameObject.name} has no connection points!", this);
             }
 
             if (autoGenerateWaypoints)
@@ -136,7 +136,7 @@ namespace OffTheRails.Tracks
 
             if (ConnectionPoints == null || ConnectionPoints.Length < 2)
             {
-                Debug.LogWarning($"Cannot generate waypoints for {gameObject.name}: need at least 2 connection points");
+                // Debug.LogWarning($"Cannot generate waypoints for {gameObject.name}: need at least 2 connection points");
                 return;
             }
 
@@ -182,7 +182,7 @@ namespace OffTheRails.Tracks
         {
             if (ConnectionPoints.Length < 3)
             {
-                Debug.LogWarning($"Junction {gameObject.name} needs at least 3 connection points");
+                // Debug.LogWarning($"Junction {gameObject.name} needs at least 3 connection points");
                 return;
             }
 
@@ -217,14 +217,14 @@ namespace OffTheRails.Tracks
         {
             if (trackType != TrackType.Junction)
             {
-                Debug.LogWarning($"{name} is not a junction");
+                // Debug.LogWarning($"{name} is not a junction");
                 return;
             }
             
             if (entryCPIndex < 0 || entryCPIndex >= ConnectionPoints.Length ||
                 exitCPIndex < 0 || exitCPIndex >= ConnectionPoints.Length)
             {
-                Debug.LogWarning($"[Junction {name}] Invalid CP indices: entry={entryCPIndex}, exit={exitCPIndex}");
+                // Debug.LogWarning($"[Junction {name}] Invalid CP indices: entry={entryCPIndex}, exit={exitCPIndex}");
                 return;
             }
             

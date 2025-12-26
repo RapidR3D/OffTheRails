@@ -40,7 +40,7 @@ namespace OffTheRails.Tracks
             }
             else if (Instance != this)
             {
-                Debug.LogWarning($"Multiple TrackManagers! Destroying duplicate on {gameObject.name}");
+                // Debug.LogWarning($"Multiple TrackManagers! Destroying duplicate on {gameObject.name}");
                 Destroy(gameObject);
                 return;
             }
@@ -124,7 +124,7 @@ namespace OffTheRails.Tracks
 
             if (endpoints.Count < 2)
             {
-                Debug.LogWarning("[TrackManager] Need at least 2 endpoints");
+                // Debug.LogWarning("[TrackManager] Need at least 2 endpoints");
                 return;
             }
 

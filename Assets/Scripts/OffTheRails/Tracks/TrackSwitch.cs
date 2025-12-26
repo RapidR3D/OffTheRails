@@ -239,7 +239,7 @@ namespace OffTheRails.Tracks
                 
                 if (newPath == null || newPath.Waypoints.Count == 0)
                 {
-                    Debug.LogWarning($"[Train {train.name}] No valid path found!");
+                    // Debug.LogWarning($"[Train {train.name}] No valid path found!");
                     continue;
                 }
                 

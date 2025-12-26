@@ -55,7 +55,7 @@ namespace OffTheRails.Trains
             {
                 if (assignment.train == null || assignment.route == null)
                 {
-                    Debug.LogWarning("[TrainRouteAssigner] Skipping assignment with null train or route");
+                    // Debug.LogWarning("[TrainRouteAssigner] Skipping assignment with null train or route");
                     continue;
                 }
                 
@@ -81,7 +81,7 @@ namespace OffTheRails.Trains
             {
                 if (assignment.train == null || assignment.route == null)
                 {
-                    Debug.LogWarning("[TrainRouteAssigner] Skipping assignment with null train or route");
+                    // Debug.LogWarning("[TrainRouteAssigner] Skipping assignment with null train or route");
                     continue;
                 }
                 

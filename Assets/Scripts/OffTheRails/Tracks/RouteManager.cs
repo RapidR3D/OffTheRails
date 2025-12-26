@@ -69,7 +69,7 @@ namespace OffTheRails.Tracks
         {
             if (route.segments.Count == 0)
             {
-                Debug.LogWarning($"[RouteManager] Route '{route.routeName}' has no segments");
+                // Debug.LogWarning($"[RouteManager] Route '{route.routeName}' has no segments");
                 return null;
             }
             
@@ -85,7 +85,7 @@ namespace OffTheRails.Tracks
             
             if (tracks.Count == 0)
             {
-                Debug.LogWarning($"[RouteManager] Route '{route.routeName}' has no valid tracks");
+                // Debug.LogWarning($"[RouteManager] Route '{route.routeName}' has no valid tracks");
                 return null;
             }
             
@@ -135,7 +135,7 @@ namespace OffTheRails.Tracks
             // Check switch requirements
             if (!route.AreSwitchRequirementsMet())
             {
-                Debug.LogWarning($"[RouteManager] Switch requirements not met for route '{route.routeName}'. Setting switches...");
+                // Debug.LogWarning($"[RouteManager] Switch requirements not met for route '{route.routeName}'. Setting switches...");
                 route.SetSwitchesForRoute();
             }
             

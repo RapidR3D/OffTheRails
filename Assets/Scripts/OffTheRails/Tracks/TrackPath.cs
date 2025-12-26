@@ -91,7 +91,7 @@ namespace OffTheRails.Tracks
             }
             else
             {
-                Debug.LogWarning($"[TrackPath] Could not find path from {start.name} to {end.name}");
+                // Debug.LogWarning($"[TrackPath] Could not find path from {start.name} to {end.name}");
             }
         }
         
@@ -105,7 +105,7 @@ namespace OffTheRails.Tracks
             
             if (segments == null || segments.Count == 0)
             {
-                Debug.LogWarning("[TrackPath] No segments provided");
+                // Debug.LogWarning("[TrackPath] No segments provided");
                 return;
             }
             
@@ -121,7 +121,7 @@ namespace OffTheRails.Tracks
             
             if (TrackPieces.Count == 0)
             {
-                Debug.LogWarning("[TrackPath] No valid tracks in segments");
+                // Debug.LogWarning("[TrackPath] No valid tracks in segments");
                 return;
             }
             
@@ -173,7 +173,7 @@ namespace OffTheRails.Tracks
                 
                 if (trackWaypoints == null || trackWaypoints.Length == 0)
                 {
-                    Debug.LogWarning($"[GenerateWaypointsFromRoute] Track {track.name} has no waypoints!");
+                    // Debug.LogWarning($"[GenerateWaypointsFromRoute] Track {track.name} has no waypoints!");
                     continue;
                 }
                 
@@ -224,7 +224,7 @@ namespace OffTheRails.Tracks
         {
             if (StartTrack == null || EndTrack == null)
             {
-                Debug.LogWarning("[TrackPath] Cannot rebuild - no start/end tracks set");
+                // Debug.LogWarning("[TrackPath] Cannot rebuild - no start/end tracks set");
                 return;
             }
             
@@ -248,7 +248,7 @@ namespace OffTheRails.Tracks
             }
             else
             {
-                Debug.LogWarning($"[TrackPath] REBUILD FAILED: No path exists from {StartTrack.name} to {EndTrack.name} with current switch states!");
+                // Debug.LogWarning($"[TrackPath] REBUILD FAILED: No path exists from {StartTrack.name} to {EndTrack.name} with current switch states!");
                 // Keep the old path data so the train doesn't get stranded
             }
         }
@@ -351,7 +351,7 @@ namespace OffTheRails.Tracks
                 
                 if (trackWaypoints == null || trackWaypoints.Length == 0)
                 {
-                    Debug.LogWarning($"[GenerateWaypoints] Track {track.name} has no waypoints!");
+                    // Debug.LogWarning($"[GenerateWaypoints] Track {track.name} has no waypoints!");
                     continue;
                 }
 

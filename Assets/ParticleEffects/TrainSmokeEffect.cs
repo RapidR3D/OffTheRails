@@ -56,12 +56,12 @@ namespace OffTheRails.Trains
             }
             else
             {
-                Debug.LogWarning("[TrainSmoke] No particle system assigned!");
+                // Debug.LogWarning("[TrainSmoke] No particle system assigned!");
             }
             
             if (train == null && dynamicTrain == null)
             {
-                Debug.LogWarning("[TrainSmoke] No Train or DynamicTrainController found!");
+                // Debug.LogWarning("[TrainSmoke] No Train or DynamicTrainController found!");
             }
         }
         
@@ -185,7 +185,7 @@ namespace OffTheRails.Trains
         {
             if (smokeParticles != null)
             {
-                Debug.LogWarning("Smoke system already exists!");
+                // Debug.LogWarning("Smoke system already exists!");
                 return;
             }
             

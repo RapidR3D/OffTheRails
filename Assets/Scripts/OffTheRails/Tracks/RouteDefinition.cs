@@ -141,7 +141,7 @@ namespace OffTheRails.Tracks
             // Log results
             if (errors.Count == 0 && warnings.Count == 0)
             {
-                // Debug.Log($"[Route {routeName}] ✓ Validation passed!");
+                Debug.Log($"[Route {routeName}] ✓ Validation passed!");
             }
             else
             {
